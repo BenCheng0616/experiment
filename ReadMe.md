@@ -9,8 +9,26 @@
     modinfo rdma_rxe
     rdma link add rxe_0 type rxe netdev ens33
     ```
-# perftest是RDMA版的iperf
-2. 安裝 Docker, Docker Compose
+2. RDMA開發環境
+    ```
+    git clone https://github.com/linux-rdma/rdma-core.git
+    cd rdma-core/
+    mkdir build
+    cd build/
+    cmake -DIN_PLACE=1 ..
+    make
+    ```
+    設定環境變量
+    ```
+    export ROOT={path/to/rdma-core}
+    export BUILD_DIR=$ROOT/build
+    export BIN=$BUILD_DIR/bin
+    export LIB=$BUILD_DIR/lib
+    export PYTHONPATH=$BUILD_DIR/python:$BUILD_DIR/python/pyverbs
+    export LD_LIBRARY_PATH=$LIB
+    export PATH=$BIN:$PATH
+    ```
+3. 安裝 Docker, Docker Compose
     ```
     apt update
     apt install -y ca-certificates curl gnupg
@@ -23,7 +41,7 @@
     apt update
     apt install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
     ```
-3. 建立並進入rdma容器
+4. 建立並進入rdma容器
     ```
     docker run --privileged --network host --device=/dev/infiniband/uverbs0 --device=/dev/infiniband/rdma_cm -dit --name rdma_container1 myrdma
 
@@ -33,16 +51,10 @@
     apt install ibverbs-providers ibverbs-utils libibverbs-dev libibverbs1 librdmacm-dev librdmacm1 rdmacm-utils libibumad-dev libibumad3 rdma-core perftest
     ```
 
-4. 編譯
+5. 執行
     ```
-    gcc -o server server.cpp -lrdmacm -libverbs -lstdc++
+    python3 filename.py
     ```
-
-5. wireshark過濾
-    ```
-    (ip.src == 192.168.30.130 or ip.src == 192.168.30.131 or ip.src == 192.168.30.132) and (ip.dst == 192.168.30.130 or ip.dst == 192.168.30.131 or ip.dst == 192.168.30.132)
-    ```
-
 6. VM建立共享資料夾
     ```
     sudo vmhgfs-fuse .host:/ /mnt/hgfs -o allow_other -o uid=1000 -o gid=1000 -o umask=022
