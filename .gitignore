@@ -1,4 +1,4 @@
 socket/bin/*
 rdma/bin/*
-!socket/bin/
-!rdma/bin/
+!socket/bin/.gitkeep
+!rdma/bin/.gitkeep
