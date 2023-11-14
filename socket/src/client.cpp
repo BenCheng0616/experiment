@@ -16,6 +16,7 @@ public:
     {
         _args = args;
         _sockfd = 0;
+        std::cout << _args.count << "\n";
     }
 
     ~Client()
@@ -51,11 +52,13 @@ public:
         int rv;
         buffer = malloc(_args.size);
         memset(buffer, '0', _args.size);
+        std::cout << _args.count << "\n";
         for (int i = 0; i < _args.count; i++)
         {
             send(_sockfd, buffer, _args.size, MSG_WAITALL);
             rv = recv(_sockfd, buffer, _args.size, 0);
             // sleep(1);
+            std::cout << i << "\n";
         }
         std::cout << "data transmitted.\n";
         free(buffer);

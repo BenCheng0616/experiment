@@ -34,6 +34,7 @@ void parseArguments(Arguments *arg, int argc, char *argv[])
             break;
         case 'c':
             arg->count = atoi(optarg);
+            std::cout << arg->count << "\n";
             break;
         case 'i':
             arg->ip = optarg;
