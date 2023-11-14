@@ -21,7 +21,6 @@ public:
 
     ~Server()
     {
-        close(_sockfd);
     }
 
     void init()
@@ -63,7 +62,7 @@ public:
         void *buffer;
         int rv;
         buffer = malloc(_args.size);
-        for (int i = 0; i < _args.count; ++i)
+        while (1)
         {
             recv(_clientSockfd, buffer, _args.size, MSG_WAITALL);
             send(_clientSockfd, buffer, _args.size, 0);

@@ -62,6 +62,11 @@ public:
         free(buffer);
     }
 
+    void stop()
+    {
+        close(_sockfd);
+    }
+
 private:
     Arguments _args;
     int _sockfd;
@@ -75,5 +80,6 @@ int main(int argc, char *argv[])
     Client client(args);
     client.init();
     client.communicate();
+    client.stop();
     return 0;
 }
