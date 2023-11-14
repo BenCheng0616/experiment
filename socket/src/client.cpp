@@ -53,10 +53,10 @@ public:
         buffer = malloc(_args.size);
         memset(buffer, '0', _args.size);
         std::cout << _args.count << "\n";
-        for (int i = 0; i < _args.count; i++)
+        for (int i = 0; i < _args.count; ++i)
         {
             send(_sockfd, buffer, _args.size, 0);
-            rv = recv(_sockfd, buffer, _args.size, MSG_WAITALL);
+            recv(_sockfd, buffer, _args.size, MSG_WAITALL);
             // sleep(1);
             std::cout << i << "\n";
         }

@@ -63,9 +63,9 @@ public:
         void *buffer;
         int rv;
         buffer = malloc(_args.size);
-        while (1)
+        for (int i = 0; i < _args.count; ++i)
         {
-            rv = recv(_clientSockfd, buffer, _args.size, MSG_WAITALL);
+            recv(_clientSockfd, buffer, _args.size, MSG_WAITALL);
             std::cout << "Received data from client.\n";
             send(_clientSockfd, buffer, _args.size, 0);
         }
