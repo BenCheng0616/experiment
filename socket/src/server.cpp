@@ -61,13 +61,11 @@ public:
         void *buffer;
         int rv;
         buffer = malloc(_args->size);
-        int i = 0;
         for (int count = 0; count < _args->count; count++)
         {
             recv(_clientSockfd, buffer, _args->size, MSG_WAITALL);
             send(_clientSockfd, buffer, _args->size, 0);
         }
-        std::cout << i << "\n";
         free(buffer);
     }
 

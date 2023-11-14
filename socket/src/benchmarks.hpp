@@ -77,6 +77,7 @@ public:
         printf("Maximum duration:   %.3f\tus\n", _bench.maximum / 1000.0);
         printf("Standard deviation: %.3f\tus\n", sigma / 1000.0);
         printf("Packet Rate:        %d\tpkt/s\n", packetRate);
+        printf("\n=====================================\n");
     }
 
     bench_t now()
@@ -84,7 +85,7 @@ public:
         struct timespec ts;
         timespec_get(&ts, TIME_UTC);
 
-        return ts.tv_sec * 1e9 + ts.tv_sec;
+        return ts.tv_sec * 1e9 + ts.tv_nsec;
     }
 
 private:
