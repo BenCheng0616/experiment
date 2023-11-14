@@ -66,7 +66,6 @@ public:
         for (int i = 0; i < _args.count; ++i)
         {
             recv(_clientSockfd, buffer, _args.size, MSG_WAITALL);
-            std::cout << "Received data from client.\n";
             send(_clientSockfd, buffer, _args.size, 0);
         }
         free(buffer);
