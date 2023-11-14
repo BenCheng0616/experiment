@@ -1,2 +1,4 @@
 socket/bin/*
 rdma/bin/*
+!socket/bin/
+!rdma/bin/
