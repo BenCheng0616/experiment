@@ -18,9 +18,9 @@ void parseArguments(Arguments *arg, int argc, char *argv[])
     arg->size = 4096;
     arg->port = "8600";
     arg->count = 1000;
-    arg->ip = NULL;
+    arg->ip = (char *)malloc(sizeof(char) * 16);
 
-    while ((opt = getopt(argc, argv, "+:s:p:c:m:")) != -1)
+    while ((opt = getopt(argc, argv, "+:s:p:c:i::")) != -1)
     {
         switch (opt)
         {
@@ -35,8 +35,12 @@ void parseArguments(Arguments *arg, int argc, char *argv[])
         case 'c':
             arg->count = atoi(optarg);
             break;
+        case 'i':
+            arg->ip = optarg;
+            std::cout << arg->ip << "\n";
+            break;
         default:
-            inet_pton(AF_INET, arg->ip, optarg);
+            continue;
         }
     }
 }
