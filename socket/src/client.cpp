@@ -7,16 +7,16 @@
 #include <string.h>
 #include <unistd.h>
 
-#include "parseargs.hpp"
-
+#include "benchmarks.hpp"
+// #include "parseargs.hpp"
 class Client
 {
 public:
-    Client(Arguments args)
+    Client(Arguments *args)
     {
         _args = args;
         _sockfd = 0;
-        std::cout << _args.count << "\n";
+        std::cout << _args->count << "\n";
     }
 
     ~Client()
@@ -26,14 +26,15 @@ public:
 
     void init()
     {
+        // connect to server.
         int res = 0;
-        struct addrinfo *serverInfo;
+        struct addrinfo *serverInfo = NULL;
         struct addrinfo hints;
         memset(&hints, 0, sizeof(hints));
         hints.ai_family = AF_INET;
         hints.ai_socktype = SOCK_STREAM;
         hints.ai_protocol = IPPROTO_TCP;
-        res = getaddrinfo(_args.ip, _args.port, &hints, &serverInfo);
+        res = getaddrinfo(_args->ip, std::to_string(_args->port).c_str(), &hints, &serverInfo);
         if ((_sockfd = socket(serverInfo->ai_family, serverInfo->ai_socktype, serverInfo->ai_protocol)) == -1)
         {
             exit(EXIT_FAILURE);
@@ -44,20 +45,23 @@ public:
         {
             exit(EXIT_FAILURE);
         }
+        freeaddrinfo(serverInfo);
     }
 
     void communicate()
     {
         void *buffer;
-        int rv;
-        buffer = malloc(_args.size);
-        memset(buffer, '0', _args.size);
-        for (int i = 0; i < _args.count; ++i)
+        buffer = malloc(_args->size);
+        memset(buffer, '0', _args->size);
+        Benchmark bench;
+        for (int count = 0; count < _args->count; count++)
         {
-            send(_sockfd, buffer, _args.size, 0);
-            recv(_sockfd, buffer, _args.size, MSG_WAITALL);
-            // sleep(1);
+            bench.singleStart();
+            send(_sockfd, buffer, _args->size, 0);
+            recv(_sockfd, buffer, _args->size, MSG_WAITALL);
+            bench.benchmark();
         }
+        bench.evaluate(_args);
         std::cout << "done.\n";
         free(buffer);
     }
@@ -68,7 +72,7 @@ public:
     }
 
 private:
-    Arguments _args;
+    Arguments *_args;
     int _sockfd;
 };
 
@@ -77,7 +81,7 @@ int main(int argc, char *argv[])
     Arguments args;
 
     parseArguments(&args, argc, argv);
-    Client client(args);
+    Client client(&args);
     client.init();
     client.communicate();
     client.stop();

@@ -12,7 +12,7 @@
 class Server
 {
 public:
-    Server(Arguments args)
+    Server(Arguments *args)
     {
         _args = args;
         _sockfd = 0;
@@ -33,7 +33,7 @@ public:
         hints.ai_socktype = SOCK_STREAM;
         hints.ai_protocol = IPPROTO_TCP;
         hints.ai_flags = AI_PASSIVE;
-        res = getaddrinfo(_args.ip, _args.port, &hints, &serverInfo);
+        res = getaddrinfo(NULL, std::to_string(_args->port).c_str(), &hints, &serverInfo);
         if ((_sockfd = socket(serverInfo->ai_family, serverInfo->ai_socktype, serverInfo->ai_protocol)) == -1)
         {
             exit(EXIT_FAILURE);
@@ -43,7 +43,6 @@ public:
         bind(_sockfd, serverInfo->ai_addr, serverInfo->ai_addrlen);
         listen(_sockfd, 5);
 
-        // std::cout << "Server Start\n";
         freeaddrinfo(serverInfo);
     }
 
@@ -51,7 +50,7 @@ public:
     {
         struct sockaddr_in clientInfo;
         int addrlen = sizeof(clientInfo);
-        if (_clientSockfd = accept(_sockfd, NULL, NULL) == -1)
+        if ((_clientSockfd = accept(_sockfd, (struct sockaddr *)&clientInfo, (socklen_t *)&addrlen)) == -1)
         {
             exit(EXIT_FAILURE);
         }
@@ -61,28 +60,29 @@ public:
     {
         void *buffer;
         int rv;
-        buffer = malloc(_args.size);
-        while (1)
+        buffer = malloc(_args->size);
+        int i = 0;
+        for (int count = 0; count < _args->count; count++)
         {
-            recv(_clientSockfd, buffer, _args.size, MSG_WAITALL);
-            send(_clientSockfd, buffer, _args.size, 0);
+            recv(_clientSockfd, buffer, _args->size, MSG_WAITALL);
+            send(_clientSockfd, buffer, _args->size, 0);
         }
+        std::cout << i << "\n";
         free(buffer);
     }
 
 private:
-    Arguments _args;
+    Arguments *_args;
     int _sockfd, _clientSockfd;
 };
 
 int main(int argc, char *argv[])
 {
-    int sockfd, clientSockfd;
     Arguments args;
 
     parseArguments(&args, argc, argv);
 
-    Server server(args);
+    Server server(&args);
     server.init();
     server.waitforClient();
     server.communicate();
