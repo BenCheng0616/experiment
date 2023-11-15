@@ -1,5 +1,5 @@
 #ifndef PARSEARGS_H
-#define PARSEATGS_H
+#define PARSEARGS_H
 
 #include <stdlib.h>
 #include <getopt.h>

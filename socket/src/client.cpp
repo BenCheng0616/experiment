@@ -8,7 +8,7 @@
 #include <unistd.h>
 
 #include "benchmarks.hpp"
-// #include "parseargs.hpp"
+#include "parseargs.hpp"
 class Client
 {
 public:
@@ -53,7 +53,7 @@ public:
         void *buffer;
         buffer = malloc(_args->size);
         memset(buffer, '0', _args->size);
-        Benchmark bench;
+        Benchmark bench(_args);
         for (int count = 0; count < _args->count; count++)
         {
             bench.singleStart();

@@ -7,6 +7,7 @@
 #include <stdio.h>
 #include <sys/time.h>
 #include <time.h>
+#include <list>
 
 #include "parseargs.hpp"
 typedef unsigned long long bench_t;
@@ -19,18 +20,20 @@ typedef struct Benchmarks
     bench_t maximum;
     bench_t sum;
     bench_t squared_sum;
+
 } Benchmarks;
 
 class Benchmark
 {
 public:
-    Benchmark()
+    Benchmark(Arguments *args)
     {
         _bench.maximum = 0;
         _bench.minimum = INT32_MAX;
         _bench.sum = 0;
         _bench.squared_sum = 0;
         _bench.total_start = this->now();
+        _timeList.resize(args->count);
     }
 
     ~Benchmark()
@@ -44,23 +47,21 @@ public:
 
     void benchmark()
     {
-        const bench_t time = this->now() - _bench.single_start;
-
-        if (time < _bench.minimum)
-        {
-            _bench.minimum = time;
-        }
-
-        if (time > _bench.maximum)
-        {
-            _bench.maximum = time;
-        }
-
-        _bench.sum += time;
-        _bench.squared_sum += (time * time);
+        _timeList.push_back(this->now() - _bench.single_start);
     }
+
     void evaluate(Arguments *args)
     {
+        _timeList.sort();
+        _bench.minimum = _timeList.front();
+        _bench.maximum = _timeList.back();
+        for (auto t = _timeList.begin(); t != _timeList.end(); t++)
+        {
+            bench_t time = *t;
+            _bench.sum += time;
+            _bench.squared_sum += (time * time);
+        }
+
         const bench_t total_time = now() - _bench.total_start;
         const double average = ((double)_bench.sum) / args->count;
         double sigma = _bench.squared_sum / args->count;
@@ -90,6 +91,7 @@ public:
 
 private:
     Benchmarks _bench;
+    std::list<bench_t> _timeList;
 };
 
 #endif
