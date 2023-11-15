@@ -56,7 +56,7 @@ public:
         {
             exit(EXIT_FAILURE);
         }
-        int opt = 1;
+
         setsockopt(_sockfd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(int));
         bind(_sockfd, serverInfo->ai_addr, serverInfo->ai_addrlen);
         listen(_sockfd, 5);
