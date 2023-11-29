@@ -1,166 +1,137 @@
 #include <iostream>
-#include <rdma/rsocket.h>
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <arpa/inet.h>
-#include <netdb.h>
-#include <time.h>
 #include <string.h>
-#include <errno.h>
+#include <netdb.h>
+#include <stdlib.h>
 #include <unistd.h>
+#include <byteswap.h>
+#include <rdma/rdma_cma.h>
+#include <rdma/rdma_verbs.h>
 
-int pktSize = 1000;
-int count = 100;
+#include "parseargs.hpp"
 
-int caltime(struct timespec start, struct timespec end)
+typedef struct pdata
 {
-    return (end.tv_sec * 1e6 + end.tv_nsec / 1000) - (start.tv_sec * 1e6 + start.tv_nsec / 1000);
-}
-
-void rsocket_test()
+    uint64_t buf_va;
+    uint32_t buf_rkey;
+} pdata;
+class Server
 {
-    int ret, sockfd = 0;
-    static int flags = 0;
-
-    struct rdma_addrinfo *rai = NULL;
-    struct rdma_addrinfo hints;
-
-    memset(&hints, 0, sizeof(hints));
-    hints.ai_flags = RAI_PASSIVE;
-    hints.ai_port_space = RDMA_PS_TCP;
-    static const char *ip = "0.0.0.0";
-    static const char *port = "5679";
-
-    rdma_getaddrinfo(ip, port, &hints, &rai);
-    sockfd = rsocket(rai->ai_family, SOCK_STREAM, 0);
-    int val = 1;
-    //int bufsize = 65536;
-    //socklen_t buflen = sizeof(bufsize);
-    rsetsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &val, sizeof(val));
-    //rsetsockopt(sockfd, SOL_RDMA, RDMA_SQSIZE, &bufsize, buflen);
-    //rsetsockopt(sockfd, SOL_RDMA, RDMA_RQSIZE, &bufsize, buflen);
-    rbind(sockfd, rai->ai_src_addr, rai->ai_src_len);
-
-    rlisten(sockfd, 3);
-    std::cout << "RDMA waiting for client.\n";
-    rdma_freeaddrinfo(rai);
-    struct sockaddr_in client;
-    int len = sizeof(client);
-    int clientSockfd = raccept(sockfd, (struct sockaddr *)&client, (socklen_t *)&len);
-    //rsetsockopt(clientSockfd, SOL_RDMA, RDMA_SQSIZE, &bufsize, buflen);
-    //rsetsockopt(clientSockfd, SOL_RDMA, RDMA_RQSIZE, &bufsize, buflen);
-    std::cout << "Client connected.\tip: " << inet_ntoa(client.sin_addr) << "\n";
-
-    void *buf;
-    buf = malloc(pktSize);
-    struct timespec start, end;
-    int offset;
-    int sum = 0;
-
-    for (int i = 0; i < count; i++)
+public:
+    Server(Arguments *args)
     {
-        clock_gettime(CLOCK_REALTIME, &start);
-        for (offset = 0; offset < pktSize;)
-        {
-            ret = rrecv(clientSockfd, buf + offset, pktSize - offset, 0);
-            // std::cout << "Recv Size: " << ret << "\n";
-            if (ret > 0)
-            {
-                offset += ret;
-            }
-        }
-
-        ret = rsend(clientSockfd, buf, pktSize, 0);
-        // usleep(10);
-        clock_gettime(CLOCK_REALTIME, &end);
-        sum += caltime(start, end);
+        _args = args;
+        _serverID = NULL;
+        _clientID = NULL;
+        _buffer = malloc(_args->size);
+        memset(_buffer, 0, _args->size);
     }
-    std::cout << strlen((char *)buf) << "\n";
-    std::cout << "RDMA Avg Time: " << sum / count << "\tus\n";
-    rclose(sockfd);
-}
 
-void socket_test()
-{
-    int ret, sockfd = 0;
-    static int flags = 0;
-
-    struct addrinfo *ai = NULL;
-    struct addrinfo hints;
-    memset(&hints, 0, sizeof(hints));
-    hints.ai_family = AF_INET;
-    hints.ai_socktype = SOCK_STREAM;
-    hints.ai_flags = AI_PASSIVE;
-    static const char *ip = "0.0.0.0";
-    static const char *port = "5678";
-    getaddrinfo(ip, port, &hints, &ai);
-    sockfd = socket(ai->ai_family, ai->ai_socktype, ai->ai_protocol);
-    bind(sockfd, ai->ai_addr, ai->ai_addrlen);
-    listen(sockfd, 3);
-    std::cout << "SOCKET waiting for client.\n";
-    struct sockaddr_in client;
-    int len = sizeof(client);
-    int clientSockfd = accept(sockfd, (struct sockaddr *)&client, (socklen_t *)&len);
-    std::cout << "Client connected.\tip: " << inet_ntoa(client.sin_addr) << "\n";
-
-    void *buf;
-    buf = malloc(pktSize);
-    struct timespec start, end;
-    int offset;
-    int sum = 0;
-    for (int i = 0; i < count; i++)
+    ~Server()
     {
-        clock_gettime(CLOCK_REALTIME, &start);
-        for (offset = 0; offset < pktSize;)
-        {
-            ret = recv(clientSockfd, buf + offset, pktSize - offset, 0);
-            if (ret > 0)
-            {
-                offset += ret;
-            }
-        }
-        send(clientSockfd, buf, pktSize, 0);
-        // std::cout << ret << "\n";
-        clock_gettime(CLOCK_REALTIME, &end);
-        sum += caltime(start, end);
     }
-    std::cout << strlen((char *)buf) << "\n";
-    std::cout << "SOCKET Avg Time: " << sum / count << "\tus\n";
-    // close(sockfd);
-}
+
+    void init()
+    {
+        int res = 0;
+        struct rdma_addrinfo *serverInfo;
+        struct rdma_addrinfo hints;
+        memset(&hints, 0, sizeof(hints));
+        hints.ai_family = AF_INET;
+        hints.ai_port_space = RDMA_PS_TCP;
+        hints.ai_flags = RAI_PASSIVE;
+        res = rdma_getaddrinfo(NULL, std::to_string(_args->port).c_str(), &hints, &serverInfo);
+        struct ibv_qp_init_attr attr;
+        memset(&attr, 0, sizeof(attr));
+        attr.cap.max_send_wr = 4;
+        attr.cap.max_recv_wr = 1;
+        attr.cap.max_send_sge = 1;
+        attr.cap.max_recv_sge = 1;
+        attr.cap.max_inline_data = 0;
+        attr.sq_sig_all = 1;
+
+        if ((res = rdma_create_ep(&_serverID, serverInfo, NULL, &attr)) == -1)
+        {
+            exit(EXIT_FAILURE);
+        }
+        rdma_listen(_serverID, 5);
+        rdma_freeaddrinfo(serverInfo);
+    }
+
+    void waitforClient()
+    {
+        int err;
+        struct rdma_cm_event *event;
+        struct rdma_conn_param conn = {};
+        pdata rep_data;
+        std::cout << "wait for client connect\n";
+
+        // establish connection and exchange rkey & mem addr with client
+        err = rdma_get_cm_event(_serverID->channel, &event);
+        if (err)
+        {
+            exit(EXIT_FAILURE);
+        }
+        if (event->event != RDMA_CM_EVENT_CONNECT_REQUEST)
+        {
+            exit(0);
+        }
+        rdma_ack_cm_event(event);
+        _clientID = event->id;
+        _client_mr = rdma_reg_msgs(_clientID, &_buffer, _args->size);
+        rep_data.buf_va = bswap_64((uintptr_t)_buffer);
+        rep_data.buf_rkey = htonl(_client_mr->rkey);
+        conn.private_data = &rep_data;
+        conn.private_data_len = sizeof(rep_data);
+        memcpy(&_client_pdata, event->param.conn.private_data, sizeof(_client_pdata));
+        rdma_accept(_clientID, &conn);
+        err = rdma_get_cm_event(_serverID->channel, &event);
+        if (err)
+        {
+            exit(EXIT_FAILURE);
+        }
+        if (event->event != RDMA_CM_EVENT_ESTABLISHED)
+        {
+            exit(0);
+        }
+        rdma_ack_cm_event(event);
+    }
+
+    void communicate()
+    {
+        int rv;
+        struct ibv_wc wc;
+        uint8_t *buf = (uint8_t *)calloc(1, sizeof(uint8_t));
+        struct ibv_mr *doorbell = rdma_reg_msgs(_clientID, &buf, sizeof(uint8_t));
+        for (int count = 0; count < _args->count; ++count)
+        {
+            // wait for remote data write into memory.
+            rdma_get_recv_comp(_clientID, &wc);
+            // write data from local memory to remote memory.
+            rdma_post_write(_clientID, NULL, _buffer, _args->size, _client_mr, 0, bswap_64(_client_pdata.buf_va), ntohl(_client_pdata.buf_rkey));
+            rdma_get_send_comp(_clientID, &wc);
+            // notify remote host WRITE operation complete.
+            rdma_post_send(_clientID, NULL, &buf, sizeof(uint8_t), doorbell, 0);
+        }
+    }
+
+private:
+    void *_buffer;
+    Arguments *_args;
+    struct rdma_cm_id *_serverID;
+    struct rdma_cm_id *_clientID;
+    struct ibv_mr *_client_mr;
+    pdata _client_pdata;
+};
 
 int main(int argc, char *argv[])
 {
-    int option;
-    int mode = 0;
-    while ((option = getopt(argc, argv, "s:c:m:")) != -1)
-    {
-        switch (option)
-        {
-        case 's':
-            pktSize = atoi(optarg);
-            break;
-        case 'c':
-            count = atoi(optarg);
-            break;
-        case 'm':
-            if (!strcmp(optarg, "R"))
-            {
-                std::cout << "Set Mode: RDMA.\n";
-                mode = 0;
-            }
-            else if (!strcmp(optarg, "S"))
-            {
-                std::cout << "Set Mode: Socket.\n";
-                mode = 1;
-            }
-            break;
-        }
-    }
-    if (!mode)
-        rsocket_test();
-    else
-        socket_test();
+    Arguments args;
+    parseArguments(&args, argc, argv);
+
+    Server server(&args);
+    server.init();
+    server.waitforClient();
+    server.communicate();
+
     return 0;
 }

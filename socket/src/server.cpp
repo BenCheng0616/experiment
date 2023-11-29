@@ -61,7 +61,7 @@ public:
         void *buffer;
         int rv;
         buffer = malloc(_args->size);
-        for (int count = 0; count < _args->count; count++)
+        for (int count = 0; count < _args->count; ++count)
         {
             recv(_clientSockfd, buffer, _args->size, MSG_WAITALL);
             send(_clientSockfd, buffer, _args->size, 0);

@@ -16,12 +16,11 @@ public:
     {
         _args = args;
         _sockfd = 0;
-        std::cout << _args->count << "\n";
     }
 
     ~Client()
     {
-        close(_sockfd);
+        stop();
     }
 
     void init()
@@ -54,7 +53,7 @@ public:
         buffer = malloc(_args->size);
         memset(buffer, '0', _args->size);
         Benchmark bench(_args);
-        for (int count = 0; count < _args->count; count++)
+        for (int count = 0; count < _args->count; ++count)
         {
             bench.singleStart();
             send(_sockfd, buffer, _args->size, 0);
@@ -79,8 +78,8 @@ private:
 int main(int argc, char *argv[])
 {
     Arguments args;
-
     parseArguments(&args, argc, argv);
+
     Client client(&args);
     client.init();
     client.communicate();
