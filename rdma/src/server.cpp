@@ -174,17 +174,26 @@ public:
         {
             rdma_post_recv(client, NULL, notification, sizeof(uint8_t), mr_notify);
             std::cout << "15\n";
+            while (ibv_poll_cq(client->recv_cq, 1, &wc) == 0)
+            {
+            }
             // rdma_get_recv_comp(client, &wc); // get write-in complete notification
             std::cout << "16\n";
             // write to remote host
             rdma_post_write(client, NULL, buffer, args->size, mr, IBV_SEND_SIGNALED, bswap_64(client_pdata.buf_va), ntohl(client_pdata.buf_rkey));
             std::cout << "17\n";
             // ibv_post_send(client->qp, &send_wr, &bad_send_wr);
+            while (ibv_poll_cq(client->send_cq, 1, &wc) == 0)
+            {
+            }
             // rdma_get_send_comp(client, &wc); // stock until rdma write complete
             std::cout << "18\n";
             // notify remote host memory write complete
             rdma_post_send(client, NULL, notification, sizeof(uint8_t), mr_notify, IBV_SEND_SIGNALED);
             std::cout << "19\n";
+            while (ibv_poll_cq(client->send_cq, 1, &wc) == 0)
+            {
+            }
             // ibv_post_send(client->qp, &send_wr_notify, &bad_send_wr_notify);
             // rdma_get_send_comp(client, &wc);
             std::cout << "20\n";
