@@ -146,6 +146,7 @@ public:
 
     void communicate()
     {
+        int num_comp;
         uint8_t *notification = (uint8_t *)calloc(1, sizeof(uint8_t));
         struct ibv_mr *mr_notify = rdma_reg_msgs(server, notification, sizeof(uint8_t) + 20);
         Benchmark bench(args);
@@ -153,13 +154,21 @@ public:
         for (int count = 0; count < args->count; ++count)
         {
             bench.singleStart();
-            rdma_post_send(server, NULL, buffer, args->size, mr, IBV_SEND_SIGNALED);
+            rdma_post_send(server, NULL, buffer, args->size, mr, 0);
+            do
+            {
+                num_comp = ibv_poll_cq(cq, 1, &wc);
+            } while (num_comp == 0);
             // ibv_get_cq_event(cc, &evt_cq, &cq_context);
             // ibv_ack_cq_events(cq, 1);
 
             // ibv_get_cq_event(cc, &evt_cq, &cq_context);
             // ibv_ack_cq_events(cq, 1);
             rdma_post_recv(server, NULL, buffer, args->size, mr);
+            do
+            {
+                num_comp = ibv_poll_cq(cq, 1, &wc);
+            } while (num_comp == 0);
 
             /*
             // write data from local memory to remote memory.

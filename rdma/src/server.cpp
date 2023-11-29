@@ -22,7 +22,7 @@ public:
     {
         this->args = args;
         buffer = malloc(args->size);
-        memset(buffer, '0', args->size);
+        memset(buffer, '1', args->size);
     }
 
     ~Server()
@@ -150,6 +150,7 @@ public:
 
     void communicate()
     {
+        int num_comp;
         uint8_t *notification = (uint8_t *)calloc(1, sizeof(uint8_t));
         struct ibv_mr *mr_notify = rdma_reg_msgs(client, notification, sizeof(uint8_t));
         // struct ibv_mr *mr_notify = ibv_reg_mr(pd, notification, sizeof(uint8_t), IBV_ACCESS_LOCAL_WRITE);
@@ -159,8 +160,16 @@ public:
             // ibv_get_cq_event(cc, &evt_cq, &cq_context);
             // ibv_ack_cq_events(cq, 1);
             rdma_post_recv(client, NULL, buffer, args->size, mr);
+            do
+            {
+                num_comp = ibv_poll_cq(cq, 1, &wc);
+            } while (num_comp == 0);
 
-            rdma_post_send(client, NULL, buffer, args->size, mr, IBV_SEND_SIGNALED);
+            rdma_post_send(client, NULL, buffer, args->size, mr, 0);
+            do
+            {
+                num_comp = ibv_poll_cq(cq, 1, &wc);
+            } while (num_comp == 0);
             // ibv_get_cq_event(cc, &evt_cq, &cq_context);
             // ibv_ack_cq_events(cq, 1);
             /*
@@ -180,6 +189,7 @@ public:
             rdma_get_send_comp(client, &wc);
             */
         }
+        std::cout << strlen((char *)buffer) << "\n";
     }
 
     void stop()
