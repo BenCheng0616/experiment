@@ -153,16 +153,16 @@ public:
         uint8_t *notification = (uint8_t *)calloc(1, sizeof(uint8_t));
         struct ibv_mr *mr_notify = rdma_reg_msgs(client, notification, sizeof(uint8_t));
         // struct ibv_mr *mr_notify = ibv_reg_mr(pd, notification, sizeof(uint8_t), IBV_ACCESS_LOCAL_WRITE);
-        rdma_post_recv(client, NULL, notification, sizeof(uint8_t), mr_notify);
+        // rdma_post_recv(client, NULL, notification, sizeof(uint8_t), mr_notify);
         for (int count = 0; count < args->count; ++count)
         {
-            ibv_get_cq_event(cc, &evt_cq, &cq_context);
-            ibv_ack_cq_events(cq, 1);
+            // ibv_get_cq_event(cc, &evt_cq, &cq_context);
+            // ibv_ack_cq_events(cq, 1);
             rdma_post_recv(client, NULL, buffer, args->size, mr);
 
             rdma_post_send(client, NULL, buffer, args->size, mr, IBV_SEND_SIGNALED);
-            ibv_get_cq_event(cc, &evt_cq, &cq_context);
-            ibv_ack_cq_events(cq, 1);
+            // ibv_get_cq_event(cc, &evt_cq, &cq_context);
+            // ibv_ack_cq_events(cq, 1);
             /*
             rdma_get_recv_comp(client, &wc);
             rdma_post_recv(client, NULL, notification, sizeof(uint8_t), mr_notify);
