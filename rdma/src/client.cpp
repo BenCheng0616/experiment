@@ -113,9 +113,9 @@ public:
 
         mr = rdma_reg_write(server, buffer, args->size);
 
-        qp_attr.cap.max_send_wr = 1;
+        qp_attr.cap.max_send_wr = args->size;
         qp_attr.cap.max_send_sge = 1;
-        qp_attr.cap.max_recv_wr = 1;
+        qp_attr.cap.max_recv_wr = args->size;
         qp_attr.cap.max_recv_sge = 1;
 
         qp_attr.send_cq = send_cq;
@@ -155,29 +155,32 @@ public:
     void communicate()
     {
         uint8_t *notification = (uint8_t *)calloc(1, sizeof(uint8_t));
-        struct ibv_mr *mr_notify = rdma_reg_msgs(server, notification, sizeof(uint8_t));
+        struct ibv_mr *mr_notify = rdma_reg_msgs(server, notification, sizeof(uint8_t) + 20);
         Benchmark bench(args);
+        rdma_post_recv(server, NULL, buffer, args->size, mr);
         for (int count = 0; count < args->count; ++count)
         {
             bench.singleStart();
+            rdma_post_send(server, NULL, buffer, args->size, mr, IBV_SEND_SIGNALED);
+            rdma_get_send_comp(server, &wc);
+
+            rdma_get_recv_comp(server, &wc);
+            rdma_post_recv(server, NULL, buffer, args->size, mr);
+
+            /*
             // write data from local memory to remote memory.
             rdma_post_write(server, NULL, buffer, args->size, mr, 0, bswap_64(server_pdata.buf_va), ntohl(server_pdata.buf_rkey));
-            while (ibv_poll_cq(send_cq, 1, &wc) == 0)
-            {
-            }
-            // rdma_get_send_comp(server, &wc);
+            rdma_get_send_comp(server, &wc);
             // notify remote host WRITE operation complete.
             rdma_post_send(server, NULL, notification, sizeof(uint8_t), mr_notify, 0);
-            while (ibv_poll_cq(send_cq, 1, &wc) == 0)
-            {
-            }
+
             // wait for remote data write into memory.
-            // rdma_get_send_comp(server, &wc);
+            rdma_get_send_comp(server, &wc);
+
+            rdma_get_recv_comp(server, &wc);
             rdma_post_recv(server, NULL, notification, sizeof(uint8_t), mr_notify);
-            while (ibv_poll_cq(recv_cq, 1, &wc) == 0)
-            {
-            }
-            // rdma_get_recv_comp(server, &wc);
+            */
+
             bench.benchmark();
         }
         bench.evaluate(args);
