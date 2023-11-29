@@ -14,16 +14,15 @@ typedef struct pdata
     uint64_t buf_va;
     uint32_t buf_rkey;
 } pdata;
+
 class Server
 {
 public:
     Server(Arguments *args)
     {
-        _args = args;
-        _serverID = NULL;
-        _clientID = NULL;
-        _buffer = malloc(_args->size);
-        memset(_buffer, 0, _args->size);
+        args = args;
+        buffer = malloc(args->size);
+        memset(buffer, '0', args->size);
     }
 
     ~Server()
@@ -32,102 +31,182 @@ public:
 
     void init()
     {
-        int res = 0;
-        struct rdma_addrinfo *serverInfo;
-        struct rdma_addrinfo hints;
-        memset(&hints, 0, sizeof(hints));
-        hints.ai_family = AF_INET;
-        hints.ai_port_space = RDMA_PS_TCP;
-        hints.ai_flags = RAI_PASSIVE;
-        res = rdma_getaddrinfo(NULL, std::to_string(_args->port).c_str(), &hints, &serverInfo);
-        struct ibv_qp_init_attr attr;
-        memset(&attr, 0, sizeof(attr));
-        attr.cap.max_send_wr = 4;
-        attr.cap.max_recv_wr = 1;
-        attr.cap.max_send_sge = 1;
-        attr.cap.max_recv_sge = 1;
-        attr.cap.max_inline_data = 0;
-        attr.sq_sig_all = 1;
-
-        if ((res = rdma_create_ep(&_serverID, serverInfo, NULL, &attr)) == -1)
+        int err;
+        ec = rdma_create_event_channel();
+        if (!ec)
         {
-            exit(EXIT_FAILURE);
+            fprintf(stderr, "create event channel error.\n");
+            return;
         }
-        rdma_listen(_serverID, 5);
-        rdma_freeaddrinfo(serverInfo);
+
+        err = rdma_create_id(ec, &server, NULL, RDMA_PS_TCP);
+        if (err)
+        {
+            fprintf(stderr, "create cm id failed.\n");
+            return;
+        }
+
+        sin.sin_family = AF_INET;
+        sin.sin_port = htons(args->port);
+        sin.sin_addr.s_addr = INADDR_ANY;
+
+        err = rdma_bind_addr(server, (struct sockaddr *)&sin);
+        if (err)
+        {
+            fprintf(stderr, "cannot bind addr.\n");
+            return;
+        }
+        err = rdma_listen(server, 1);
+        if (err)
+        {
+            fprintf(stderr, "server listen failed.\n");
+        }
     }
 
     void waitforClient()
     {
         int err;
-        struct rdma_cm_event *event;
-        struct rdma_conn_param conn = {};
-        pdata rep_data;
-        std::cout << "wait for client connect\n";
-
-        // establish connection and exchange rkey & mem addr with client
-        err = rdma_get_cm_event(_serverID->channel, &event);
+        pdata repdata;
+        err = rdma_get_cm_event(ec, &event);
         if (err)
         {
-            exit(EXIT_FAILURE);
+            fprintf(stderr, "rdma get cm event failed.\n");
+            return;
         }
         if (event->event != RDMA_CM_EVENT_CONNECT_REQUEST)
-        {
-            exit(0);
-        }
+            return;
+
+        client = event->id;
+        memcpy(&client_pdata, event->param.conn.private_data, sizeof(client_pdata));
         rdma_ack_cm_event(event);
-        _clientID = event->id;
-        _client_mr = rdma_reg_msgs(_clientID, &_buffer, _args->size);
-        rep_data.buf_va = bswap_64((uintptr_t)_buffer);
-        rep_data.buf_rkey = htonl(_client_mr->rkey);
-        conn.private_data = &rep_data;
-        conn.private_data_len = sizeof(rep_data);
-        memcpy(&_client_pdata, event->param.conn.private_data, sizeof(_client_pdata));
-        rdma_accept(_clientID, &conn);
-        err = rdma_get_cm_event(_serverID->channel, &event);
+
+        pd = ibv_alloc_pd(client->verbs);
+        if (!pd)
+        {
+            fprintf(stderr, "alloc pd failed.\n");
+            return;
+        }
+
+        cc = ibv_create_comp_channel(client->verbs);
+        if (!cc)
+        {
+            fprintf(stderr, "create comp channel failed.\n");
+            return;
+        }
+
+        cq = ibv_create_cq(client->verbs, 1, NULL, cc, 0);
+        if (!cq)
+        {
+            fprintf(stderr, "cannot create cq.\n");
+            return;
+        }
+
+        if (ibv_req_notify_cq(cq, 0))
+            return;
+
+        mr = rdma_reg_write(client, buffer, args->size);
+        // mr = ibv_reg_mr(pd, buffer, args->size, IBV_ACCESS_LOCAL_WRITE | IBV_ACCESS_REMOTE_WRITE);
+        if (!mr)
+        {
+            fprintf(stderr, "register memory region failed.\n");
+            return;
+        }
+
+        memset(&qp_attr, 0, sizeof(qp_attr));
+        qp_attr.cap.max_send_wr = 1;
+        qp_attr.cap.max_send_sge = 1;
+        qp_attr.cap.max_recv_wr = 1;
+        qp_attr.cap.max_recv_sge = 1;
+
+        qp_attr.send_cq = cq;
+        qp_attr.recv_cq = cq;
+        qp_attr.qp_type = IBV_QPT_RC;
+
+        err = rdma_create_qp(client, pd, &qp_attr);
         if (err)
         {
-            exit(EXIT_FAILURE);
+            fprintf(stderr, "rdma cm create qp error.\n");
+            return;
+        }
+
+        repdata.buf_va = bswap_64((uintptr_t)buffer);
+        repdata.buf_rkey = htonl(mr->rkey);
+        conn_param.responder_resources = 1;
+        conn_param.private_data = &repdata;
+        conn_param.private_data_len = sizeof(repdata);
+
+        err = rdma_accept(client, &conn_param);
+        if (err)
+            return;
+
+        err = rdma_get_cm_event(ec, &event);
+        if (err)
+        {
+            fprintf(stderr, "rdma get cm event failed.\n");
         }
         if (event->event != RDMA_CM_EVENT_ESTABLISHED)
-        {
-            exit(0);
-        }
+            return;
+
         rdma_ack_cm_event(event);
     }
 
     void communicate()
     {
-        int rv;
-        struct ibv_wc wc;
-        uint8_t *buf = (uint8_t *)calloc(1, sizeof(uint8_t));
-        struct ibv_mr *doorbell = rdma_reg_msgs(_clientID, &buf, sizeof(uint8_t));
-        for (int count = 0; count < _args->count; ++count)
+        uint8_t *notification = (uint8_t *)calloc(1, sizeof(uint8_t));
+        struct ibv_mr *mr_notify = rdma_reg_msgs(client, notification, sizeof(uint8_t));
+        // struct ibv_mr *mr_notify = ibv_reg_mr(pd, notification, sizeof(uint8_t), IBV_ACCESS_LOCAL_WRITE);
+
+        for (int count = 0; count < args->count; ++count)
         {
-            // wait for remote data write into memory.
-            rdma_get_recv_comp(_clientID, &wc);
-            // write data from local memory to remote memory.
-            rdma_post_write(_clientID, NULL, _buffer, _args->size, _client_mr, 0, bswap_64(_client_pdata.buf_va), ntohl(_client_pdata.buf_rkey));
-            rdma_get_send_comp(_clientID, &wc);
-            // notify remote host WRITE operation complete.
-            rdma_post_send(_clientID, NULL, &buf, sizeof(uint8_t), doorbell, 0);
+            rdma_post_recv(client, NULL, notification, sizeof(uint8_t), mr_notify);
+            rdma_get_recv_comp(client, &wc); // get write-in complete notification
+            // write to remote host
+            rdma_post_write(client, NULL, buffer, args->size, mr, IBV_SEND_SIGNALED, bswap_64(client_pdata.buf_va), ntohl(client_pdata.buf_rkey));
+            // ibv_post_send(client->qp, &send_wr, &bad_send_wr);
+            rdma_get_send_comp(client, &wc); // stock until rdma write complete
+            // notify remote host memory write complete
+            rdma_post_send(client, NULL, notification, sizeof(uint8_t), mr_notify, IBV_SEND_SIGNALED);
+            // ibv_post_send(client->qp, &send_wr_notify, &bad_send_wr_notify);
+            rdma_get_send_comp(client, &wc);
         }
     }
 
+    void stop()
+    {
+        int err = rdma_get_cm_event(ec, &event);
+        if (event->event == RDMA_CM_EVENT_DISCONNECTED)
+        {
+            rdma_destroy_qp(client);
+            rdma_dereg_mr(mr);
+            free(buffer);
+            rdma_destroy_id(server);
+        }
+        rdma_destroy_event_channel(ec);
+    }
+
 private:
-    void *_buffer;
-    Arguments *_args;
-    struct rdma_cm_id *_serverID;
-    struct rdma_cm_id *_clientID;
-    struct ibv_mr *_client_mr;
-    pdata _client_pdata;
+    void *buffer;
+    Arguments *args;
+    struct rdma_event_channel *ec = NULL;
+    struct rdma_cm_event *event = NULL;
+    struct rdma_cm_id *server = NULL;
+    struct rdma_cm_id *client = NULL;
+    struct rdma_conn_param conn_param = {};
+    struct ibv_pd *pd;
+    struct ibv_comp_channel *cc;
+    struct ibv_cq *cq;
+    struct ibv_mr *mr;
+    struct ibv_qp_init_attr qp_attr = {};
+    struct ibv_wc wc;
+    struct sockaddr_in sin;
+
+    pdata client_pdata;
 };
 
 int main(int argc, char *argv[])
 {
     Arguments args;
     parseArguments(&args, argc, argv);
-
     Server server(&args);
     server.init();
     server.waitforClient();
