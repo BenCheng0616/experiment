@@ -93,14 +93,22 @@ public:
             return;
         }
         std::cout << "9\n";
-        cq = ibv_create_cq(server->verbs, 2, NULL, cc, 0);
-        if (!cq)
+        send_cq = ibv_create_cq(server->verbs, 1, NULL, cc, 0);
+        if (!send_cq)
+        {
+            fprintf(stderr, "cannot create cq.\n");
+            return;
+        }
+        recv_cq = ibv_create_cq(server->verbs, 1, NULL, cc, 0);
+        if (!send_cq)
         {
             fprintf(stderr, "cannot create cq.\n");
             return;
         }
         std::cout << "10\n";
-        if (ibv_req_notify_cq(cq, 0))
+        if (ibv_req_notify_cq(send_cq, 0))
+            return;
+        if (ibv_req_notify_cq(recv_cq, 0))
             return;
         std::cout << "11\n";
         mr = rdma_reg_write(server, buffer, args->size);
@@ -110,8 +118,8 @@ public:
         qp_attr.cap.max_recv_wr = 1;
         qp_attr.cap.max_recv_sge = 1;
 
-        qp_attr.send_cq = cq;
-        qp_attr.recv_cq = cq;
+        qp_attr.send_cq = send_cq;
+        qp_attr.recv_cq = recv_cq;
         qp_attr.qp_type = IBV_QPT_RC;
 
         err = rdma_create_qp(server, pd, &qp_attr);
@@ -142,6 +150,7 @@ public:
             return;
         std::cout << "15\n";
         memcpy(&server_pdata, event->param.conn.private_data, sizeof(server_pdata));
+        std::cout << bswap_64(server_pdata.buf_va) << "," << ntohl(server_pdata.buf_rkey) << "\n";
         rdma_ack_cm_event(event);
     }
 
@@ -194,7 +203,8 @@ private:
     struct rdma_conn_param conn_param = {};
     struct ibv_pd *pd;
     struct ibv_comp_channel *cc;
-    struct ibv_cq *cq;
+    struct ibv_cq *send_cq;
+    struct ibv_cq *recv_cq;
     struct ibv_mr *mr;
     struct ibv_qp_init_attr qp_attr = {};
     struct ibv_wc wc;
