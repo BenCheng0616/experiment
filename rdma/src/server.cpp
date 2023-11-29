@@ -94,22 +94,14 @@ public:
             fprintf(stderr, "create comp channel failed.\n");
             return;
         }
-        send_cq = ibv_create_cq(client->verbs, 512, NULL, cc, 0);
-        if (!send_cq)
-        {
-            fprintf(stderr, "cannot create cq.\n");
-            return;
-        }
-        recv_cq = ibv_create_cq(client->verbs, 512, NULL, cc, 0);
-        if (!recv_cq)
+        cq = ibv_create_cq(client->verbs, 512, NULL, cc, 0);
+        if (!cq)
         {
             fprintf(stderr, "cannot create cq.\n");
             return;
         }
 
-        if (ibv_req_notify_cq(send_cq, 0))
-            return;
-        if (ibv_req_notify_cq(recv_cq, 0))
+        if (ibv_req_notify_cq(cq, 0))
             return;
 
         mr = rdma_reg_write(client, buffer, args->size);
@@ -126,8 +118,8 @@ public:
         qp_attr.cap.max_recv_wr = args->size;
         qp_attr.cap.max_recv_sge = 1;
 
-        qp_attr.send_cq = send_cq;
-        qp_attr.recv_cq = recv_cq;
+        qp_attr.send_cq = cq;
+        qp_attr.recv_cq = cq;
         qp_attr.qp_type = IBV_QPT_RC;
 
         err = rdma_create_qp(client, pd, &qp_attr);
@@ -164,11 +156,13 @@ public:
         rdma_post_recv(client, NULL, notification, sizeof(uint8_t), mr_notify);
         for (int count = 0; count < args->count; ++count)
         {
-            rdma_get_recv_comp(client, &wc);
+            ibv_get_cq_event(cc, &evt_cq, &cq_context);
+            ibv_ack_cq_events(cq, 1);
             rdma_post_recv(client, NULL, buffer, args->size, mr);
 
             rdma_post_send(client, NULL, buffer, args->size, mr, IBV_SEND_SIGNALED);
-            rdma_get_send_comp(client, &wc);
+            ibv_get_cq_event(cc, &evt_cq, &cq_context);
+            ibv_ack_cq_events(cq, 1);
             /*
             rdma_get_recv_comp(client, &wc);
             rdma_post_recv(client, NULL, notification, sizeof(uint8_t), mr_notify);
@@ -211,13 +205,13 @@ private:
     struct rdma_conn_param conn_param = {};
     struct ibv_pd *pd;
     struct ibv_comp_channel *cc;
-    struct ibv_cq *send_cq;
-    struct ibv_cq *recv_cq;
+    struct ibv_cq *cq;
+    struct ibv_cq *evt_cq;
     struct ibv_mr *mr;
     struct ibv_qp_init_attr qp_attr = {};
     struct ibv_wc wc;
     struct sockaddr_in sin;
-
+    void *cq_context;
     pdata client_pdata;
 };
 

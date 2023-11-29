@@ -93,22 +93,14 @@ public:
             return;
         }
 
-        send_cq = ibv_create_cq(server->verbs, 512, NULL, cc, 0);
-        if (!send_cq)
-        {
-            fprintf(stderr, "cannot create cq.\n");
-            return;
-        }
-        recv_cq = ibv_create_cq(server->verbs, 512, NULL, cc, 0);
-        if (!send_cq)
+        cq = ibv_create_cq(server->verbs, 512, NULL, cc, 0);
+        if (!cq)
         {
             fprintf(stderr, "cannot create cq.\n");
             return;
         }
 
-        if (ibv_req_notify_cq(send_cq, 0))
-            return;
-        if (ibv_req_notify_cq(recv_cq, 0))
+        if (ibv_req_notify_cq(cq, 0))
             return;
 
         mr = rdma_reg_write(server, buffer, args->size);
@@ -118,8 +110,8 @@ public:
         qp_attr.cap.max_recv_wr = args->size;
         qp_attr.cap.max_recv_sge = 1;
 
-        qp_attr.send_cq = send_cq;
-        qp_attr.recv_cq = recv_cq;
+        qp_attr.send_cq = cq;
+        qp_attr.recv_cq = cq;
         qp_attr.qp_type = IBV_QPT_RC;
 
         err = rdma_create_qp(server, pd, &qp_attr);
@@ -162,9 +154,11 @@ public:
         {
             bench.singleStart();
             rdma_post_send(server, NULL, buffer, args->size, mr, IBV_SEND_SIGNALED);
-            rdma_get_send_comp(server, &wc);
+            ibv_get_cq_event(cc, &evt_cq, &cq_context);
+            ibv_ack_cq_events(cq, 1);
 
-            rdma_get_recv_comp(server, &wc);
+            ibv_get_cq_event(cc, &evt_cq, &cq_context);
+            ibv_ack_cq_events(cq, 1);
             rdma_post_recv(server, NULL, buffer, args->size, mr);
 
             /*
@@ -207,11 +201,12 @@ private:
     struct rdma_conn_param conn_param = {};
     struct ibv_pd *pd;
     struct ibv_comp_channel *cc;
-    struct ibv_cq *send_cq;
-    struct ibv_cq *recv_cq;
+    struct ibv_cq *cq;
+    struct ibv_cq *evt_cq;
     struct ibv_mr *mr;
     struct ibv_qp_init_attr qp_attr = {};
     struct ibv_wc wc;
+    void *cq_context;
 
     pdata server_pdata;
 };
