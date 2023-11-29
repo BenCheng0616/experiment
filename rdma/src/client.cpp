@@ -113,7 +113,7 @@ public:
         std::cout << "11\n";
         mr = rdma_reg_write(server, buffer, args->size);
         std::cout << "12\n";
-        qp_attr.cap.max_send_wr = 4;
+        qp_attr.cap.max_send_wr = 1;
         qp_attr.cap.max_send_sge = 1;
         qp_attr.cap.max_recv_wr = 1;
         qp_attr.cap.max_recv_sge = 1;
@@ -166,17 +166,17 @@ public:
             // write data from local memory to remote memory.
             rdma_post_write(server, NULL, buffer, args->size, mr, 0, bswap_64(server_pdata.buf_va), ntohl(server_pdata.buf_rkey));
             std::cout << "17\n";
-            rdma_get_send_comp(server, &wc);
+            // rdma_get_send_comp(server, &wc);
             std::cout << "18\n";
             // notify remote host WRITE operation complete.
             rdma_post_send(server, NULL, notification, sizeof(uint8_t), mr_notify, 0);
             std::cout << "19\n";
             // wait for remote data write into memory.
-            rdma_get_send_comp(server, &wc);
+            // rdma_get_send_comp(server, &wc);
             std::cout << "20\n";
             rdma_post_recv(server, NULL, notification, sizeof(uint8_t), mr_notify);
             std::cout << "21\n";
-            rdma_get_recv_comp(server, &wc);
+            // rdma_get_recv_comp(server, &wc);
             bench.benchmark();
         }
         bench.evaluate(args);
