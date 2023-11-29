@@ -156,20 +156,27 @@ public:
     {
         uint8_t *notification = (uint8_t *)calloc(1, sizeof(uint8_t));
         struct ibv_mr *mr_notify = rdma_reg_msgs(client, notification, sizeof(uint8_t));
+        std::cout << "14\n";
         // struct ibv_mr *mr_notify = ibv_reg_mr(pd, notification, sizeof(uint8_t), IBV_ACCESS_LOCAL_WRITE);
 
         for (int count = 0; count < args->count; ++count)
         {
             rdma_post_recv(client, NULL, notification, sizeof(uint8_t), mr_notify);
+            std::cout << "15\n";
             rdma_get_recv_comp(client, &wc); // get write-in complete notification
+            std::cout << "16\n";
             // write to remote host
             rdma_post_write(client, NULL, buffer, args->size, mr, IBV_SEND_SIGNALED, bswap_64(client_pdata.buf_va), ntohl(client_pdata.buf_rkey));
+            std::cout << "17\n";
             // ibv_post_send(client->qp, &send_wr, &bad_send_wr);
             rdma_get_send_comp(client, &wc); // stock until rdma write complete
+            std::cout << "18\n";
             // notify remote host memory write complete
             rdma_post_send(client, NULL, notification, sizeof(uint8_t), mr_notify, IBV_SEND_SIGNALED);
+            std::cout << "19\n";
             // ibv_post_send(client->qp, &send_wr_notify, &bad_send_wr_notify);
             rdma_get_send_comp(client, &wc);
+            std::cout << "20\n";
         }
     }
 

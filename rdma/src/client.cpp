@@ -149,18 +149,24 @@ public:
     {
         uint8_t *notification = (uint8_t *)calloc(1, sizeof(uint8_t));
         struct ibv_mr *mr_notify = rdma_reg_msgs(server, notification, sizeof(uint8_t));
+        std::cout << "16\n";
         Benchmark bench(args);
         for (int count = 0; count < args->count; ++count)
         {
             bench.singleStart();
             // write data from local memory to remote memory.
             rdma_post_write(server, NULL, buffer, args->size, mr, 0, bswap_64(server_pdata.buf_va), ntohl(server_pdata.buf_rkey));
+            std::cout << "17\n";
             rdma_get_send_comp(server, &wc);
+            std::cout << "18\n";
             // notify remote host WRITE operation complete.
             rdma_post_send(server, NULL, notification, sizeof(uint8_t), mr_notify, 0);
+            std::cout << "19\n";
             // wait for remote data write into memory.
             rdma_get_send_comp(server, &wc);
+            std::cout << "20\n";
             rdma_post_recv(server, NULL, notification, sizeof(uint8_t), mr_notify);
+            std::cout << "21\n";
             rdma_get_recv_comp(server, &wc);
             bench.benchmark();
         }
