@@ -20,7 +20,7 @@ class Server
 public:
     Server(Arguments *args)
     {
-        args = args;
+        this->args = args;
         buffer = malloc(args->size);
         memset(buffer, '0', args->size);
     }
@@ -38,14 +38,14 @@ public:
             fprintf(stderr, "create event channel error.\n");
             return;
         }
-
+        std::cout << "1\n";
         err = rdma_create_id(ec, &server, NULL, RDMA_PS_TCP);
         if (err)
         {
             fprintf(stderr, "create cm id failed.\n");
             return;
         }
-
+        std::cout << "2\n";
         sin.sin_family = AF_INET;
         sin.sin_port = htons(args->port);
         sin.sin_addr.s_addr = INADDR_ANY;
@@ -56,11 +56,13 @@ public:
             fprintf(stderr, "cannot bind addr.\n");
             return;
         }
+        std::cout << "3\n";
         err = rdma_listen(server, 1);
         if (err)
         {
             fprintf(stderr, "server listen failed.\n");
         }
+        std::cout << "4\n";
     }
 
     void waitforClient()
@@ -75,7 +77,7 @@ public:
         }
         if (event->event != RDMA_CM_EVENT_CONNECT_REQUEST)
             return;
-
+        std::cout << "5\n";
         client = event->id;
         memcpy(&client_pdata, event->param.conn.private_data, sizeof(client_pdata));
         rdma_ack_cm_event(event);
@@ -86,24 +88,24 @@ public:
             fprintf(stderr, "alloc pd failed.\n");
             return;
         }
-
+        std::cout << "6\n";
         cc = ibv_create_comp_channel(client->verbs);
         if (!cc)
         {
             fprintf(stderr, "create comp channel failed.\n");
             return;
         }
-
+        std::cout << "7\n";
         cq = ibv_create_cq(client->verbs, 1, NULL, cc, 0);
         if (!cq)
         {
             fprintf(stderr, "cannot create cq.\n");
             return;
         }
-
+        std::cout << "8\n";
         if (ibv_req_notify_cq(cq, 0))
             return;
-
+        std::cout << "9\n";
         mr = rdma_reg_write(client, buffer, args->size);
         // mr = ibv_reg_mr(pd, buffer, args->size, IBV_ACCESS_LOCAL_WRITE | IBV_ACCESS_REMOTE_WRITE);
         if (!mr)
@@ -111,7 +113,7 @@ public:
             fprintf(stderr, "register memory region failed.\n");
             return;
         }
-
+        std::cout << "10\n";
         memset(&qp_attr, 0, sizeof(qp_attr));
         qp_attr.cap.max_send_wr = 1;
         qp_attr.cap.max_send_sge = 1;
@@ -128,7 +130,7 @@ public:
             fprintf(stderr, "rdma cm create qp error.\n");
             return;
         }
-
+        std::cout << "11\n";
         repdata.buf_va = bswap_64((uintptr_t)buffer);
         repdata.buf_rkey = htonl(mr->rkey);
         conn_param.responder_resources = 1;
@@ -138,7 +140,7 @@ public:
         err = rdma_accept(client, &conn_param);
         if (err)
             return;
-
+        std::cout << "12\n";
         err = rdma_get_cm_event(ec, &event);
         if (err)
         {
@@ -146,7 +148,7 @@ public:
         }
         if (event->event != RDMA_CM_EVENT_ESTABLISHED)
             return;
-
+        std::cout << "13\n";
         rdma_ack_cm_event(event);
     }
 

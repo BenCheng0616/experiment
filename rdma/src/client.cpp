@@ -20,7 +20,7 @@ class Client
 public:
     Client(Arguments *args)
     {
-        args = args;
+        this->args = args;
         buffer = malloc(args->size);
         memset(buffer, '0', args->size);
     }
