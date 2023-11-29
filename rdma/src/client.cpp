@@ -93,13 +93,13 @@ public:
             return;
         }
 
-        send_cq = ibv_create_cq(server->verbs, 1, NULL, cc, 0);
+        send_cq = ibv_create_cq(server->verbs, 512, NULL, cc, 0);
         if (!send_cq)
         {
             fprintf(stderr, "cannot create cq.\n");
             return;
         }
-        recv_cq = ibv_create_cq(server->verbs, 1, NULL, cc, 0);
+        recv_cq = ibv_create_cq(server->verbs, 512, NULL, cc, 0);
         if (!send_cq)
         {
             fprintf(stderr, "cannot create cq.\n");
@@ -162,19 +162,19 @@ public:
             bench.singleStart();
             // write data from local memory to remote memory.
             rdma_post_write(server, NULL, buffer, args->size, mr, 0, bswap_64(server_pdata.buf_va), ntohl(server_pdata.buf_rkey));
-            while (ibv_poll_cq(server->send_cq, 1, &wc) == 0)
+            while (ibv_poll_cq(send_cq, 1, &wc) == 0)
             {
             }
             // rdma_get_send_comp(server, &wc);
             // notify remote host WRITE operation complete.
             rdma_post_send(server, NULL, notification, sizeof(uint8_t), mr_notify, 0);
-            while (ibv_poll_cq(server->send_cq, 1, &wc) == 0)
+            while (ibv_poll_cq(send_cq, 1, &wc) == 0)
             {
             }
             // wait for remote data write into memory.
             // rdma_get_send_comp(server, &wc);
             rdma_post_recv(server, NULL, notification, sizeof(uint8_t), mr_notify);
-            while (ibv_poll_cq(server->recv_cq, 1, &wc) == 0)
+            while (ibv_poll_cq(recv_cq, 1, &wc) == 0)
             {
             }
             // rdma_get_recv_comp(server, &wc);

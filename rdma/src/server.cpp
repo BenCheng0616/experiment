@@ -96,13 +96,13 @@ public:
             return;
         }
         std::cout << "7\n";
-        send_cq = ibv_create_cq(client->verbs, 1, NULL, cc, 0);
+        send_cq = ibv_create_cq(client->verbs, 512, NULL, cc, 0);
         if (!send_cq)
         {
             fprintf(stderr, "cannot create cq.\n");
             return;
         }
-        recv_cq = ibv_create_cq(client->verbs, 1, NULL, cc, 0);
+        recv_cq = ibv_create_cq(client->verbs, 512, NULL, cc, 0);
         if (!recv_cq)
         {
             fprintf(stderr, "cannot create cq.\n");
@@ -174,7 +174,7 @@ public:
         {
             rdma_post_recv(client, NULL, notification, sizeof(uint8_t), mr_notify);
             std::cout << "15\n";
-            while (ibv_poll_cq(client->recv_cq, 1, &wc) == 0)
+            while (ibv_poll_cq(recv_cq, 1, &wc) == 0)
             {
             }
             // rdma_get_recv_comp(client, &wc); // get write-in complete notification
@@ -183,15 +183,16 @@ public:
             rdma_post_write(client, NULL, buffer, args->size, mr, IBV_SEND_SIGNALED, bswap_64(client_pdata.buf_va), ntohl(client_pdata.buf_rkey));
             std::cout << "17\n";
             // ibv_post_send(client->qp, &send_wr, &bad_send_wr);
-            while (ibv_poll_cq(client->send_cq, 1, &wc) == 0)
+            while (ibv_poll_cq(send_cq, 1, &wc) == 0)
             {
             }
             // rdma_get_send_comp(client, &wc); // stock until rdma write complete
             std::cout << "18\n";
             // notify remote host memory write complete
+
             rdma_post_send(client, NULL, notification, sizeof(uint8_t), mr_notify, IBV_SEND_SIGNALED);
             std::cout << "19\n";
-            while (ibv_poll_cq(client->send_cq, 1, &wc) == 0)
+            while (ibv_poll_cq(send_cq, 1, &wc) == 0)
             {
             }
             // ibv_post_send(client->qp, &send_wr_notify, &bad_send_wr_notify);
