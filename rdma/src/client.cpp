@@ -43,22 +43,22 @@ public:
             fprintf(stderr, "create event channel error.\n");
             return;
         }
-
+        std::cout << "1\n";
         err = rdma_create_id(ec, &server, NULL, RDMA_PS_TCP);
         if (err)
         {
             fprintf(stderr, "create cm id failed.\n");
             return;
         }
-
+        std::cout << "2\n";
         n = getaddrinfo(args->ip, std::to_string(args->port).c_str(), &hints, &res);
         if (n < 0)
             return;
-
+        std::cout << "3\n";
         err = rdma_resolve_addr(server, NULL, res->ai_addr, 5000);
         if (err)
             return;
-
+        std::cout << "4\n";
         err = rdma_get_cm_event(ec, &event);
         if (err)
             return;
@@ -67,15 +67,15 @@ public:
             return;
 
         rdma_ack_cm_event(event);
-
+        std::cout << "5\n";
         err = rdma_resolve_route(server, 5000);
         if (err)
             return;
-
+        std::cout << "6\n";
         err = rdma_get_cm_event(ec, &event);
         if (err)
             return;
-
+        std::cout << "7\n";
         if (event->event != RDMA_CM_EVENT_ROUTE_RESOLVED)
             return;
 
@@ -85,26 +85,26 @@ public:
             fprintf(stderr, "alloc pd failed.\n");
             return;
         }
-
+        std::cout << "8\n";
         cc = ibv_create_comp_channel(server->verbs);
         if (!cc)
         {
             fprintf(stderr, "create comp channel failed.\n");
             return;
         }
-
+        std::cout << "9\n";
         cq = ibv_create_cq(server->verbs, 2, NULL, cc, 0);
         if (!cq)
         {
             fprintf(stderr, "cannot create cq.\n");
             return;
         }
-
+        std::cout << "10\n";
         if (ibv_req_notify_cq(cq, 0))
             return;
-
+        std::cout << "11\n";
         mr = rdma_reg_write(server, buffer, args->size);
-
+        std::cout << "12\n";
         qp_attr.cap.max_send_wr = 4;
         qp_attr.cap.max_send_sge = 1;
         qp_attr.cap.max_recv_wr = 1;
@@ -120,7 +120,7 @@ public:
             fprintf(stderr, "rdma cm create qp error.\n");
             return;
         }
-
+        std::cout << "13\n";
         repdata.buf_va = bswap_64((uintptr_t)buffer);
         repdata.buf_rkey = htonl(mr->rkey);
         conn_param.responder_resources = 1;
@@ -132,7 +132,7 @@ public:
         err = rdma_connect(server, &conn_param);
         if (err)
             return;
-
+        std::cout << "14\n";
         err = rdma_get_cm_event(ec, &event);
         if (err)
         {
@@ -140,7 +140,7 @@ public:
         }
         if (event->event != RDMA_CM_EVENT_ESTABLISHED)
             return;
-
+        std::cout << "15\n";
         memcpy(&server_pdata, event->param.conn.private_data, sizeof(server_pdata));
         rdma_ack_cm_event(event);
     }
