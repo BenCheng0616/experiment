@@ -160,16 +160,14 @@ public:
             // ibv_get_cq_event(cc, &evt_cq, &cq_context);
             // ibv_ack_cq_events(cq, 1);
             rdma_post_recv(client, NULL, buffer, args->size, mr);
-            do
-            {
-                num_comp = ibv_poll_cq(cq, 1, &wc);
-            } while (num_comp == 0);
+            ibv_get_cq_event(cc, &evt_cq, &cq_context);
+            ibv_req_notify_cq(cq, 0);
+            ibv_poll_cq(cq, 1, &wc);
 
             rdma_post_send(client, NULL, buffer, args->size, mr, 0);
-            do
-            {
-                num_comp = ibv_poll_cq(cq, 1, &wc);
-            } while (num_comp == 0);
+            ibv_get_cq_event(cc, &evt_cq, &cq_context);
+            ibv_req_notify_cq(cq, 0);
+            ibv_poll_cq(cq, 1, &wc);
             // ibv_get_cq_event(cc, &evt_cq, &cq_context);
             // ibv_ack_cq_events(cq, 1);
             /*
