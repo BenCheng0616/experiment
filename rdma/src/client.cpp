@@ -330,37 +330,36 @@ int main(int argc, char *argv[])
         return ret;
     }
     server_sockaddr.sin_port = htons(args.port);
-    printf("check\n");
+
     ret = client_prepare_connection(&server_sockaddr);
     if (ret)
     {
         return ret;
     }
-    printf("check\n");
+
     ret = client_pre_post_recv_buffer();
     if (ret)
     {
         return ret;
     }
-    printf("check\n");
+
     ret = client_connect_to_server();
     if (ret)
     {
         return ret;
     }
-    printf("check\n");
+
     ret = client_xchange_metadata_with_server();
     if (ret)
     {
         return ret;
     }
-    printf("check\n");
+
     ret = client_remote_memory_ops();
     if (ret)
     {
         return ret;
     }
-    printf("check\n");
 
     printf("SUCCESS\n");
     ret = client_disconnect_and_clean();

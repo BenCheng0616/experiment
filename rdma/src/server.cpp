@@ -275,6 +275,13 @@ int server_remote_memory_ops()
 {
     struct ibv_wc wc;
     int ret = -1, i;
+    client_recv_sge.addr = (uint64_t)server_buffer_mr->addr;
+    client_recv_sge.length = server_buffer_mr->length;
+    client_recv_sge.lkey = server_buffer_mr->lkey;
+    bzero(&client_recv_wr, sizeof(client_recv_wr));
+    client_recv_wr.sg_list = &client_recv_sge;
+    client_recv_wr.num_sge = 1;
+    ret = ibv_post_recv(client_qp, &client_recv_wr, &bad_client_recv_wr);
     /*
     for (i = 0; i < args.count; i++)
     {
@@ -299,7 +306,7 @@ int server_remote_memory_ops()
         ret = process_work_completion_events(io_completion_channel, &wc, 1);
     }
     */
-    // ret = process_work_completion_events(io_completion_channel, &wc, 1);
+    ret = process_work_completion_events(io_completion_channel, &wc, 1);
     printf("%s\n", (char *)src);
     return 0;
 }
