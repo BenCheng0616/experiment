@@ -21,7 +21,7 @@ struct ibv_recv_wr server_recv_wr, *bad_server_recv_wr = NULL;
 struct ibv_recv_wr server_recv_comp_wr, *bad_server_recv_comp_wr = NULL;
 struct ibv_sge client_send_sge, server_recv_sge;
 Arguments args;
-void *src = NULL;
+void *src = NULL, *dst = NULL;
 
 int client_prepare_connection(struct sockaddr_in *s_addr)
 {
@@ -237,13 +237,14 @@ int client_xchange_metadata_with_server()
     {
         return ret;
     }
+    show_rdma_buffer_attr(&client_metadata_attr);
     show_rdma_buffer_attr(&server_metadata_attr);
     return 0;
 }
 
 int client_remote_memory_ops()
 {
-    struct ibv_wc wc[2];
+    struct ibv_wc wc;
     int ret = -1, i;
 
     bzero(&client_send_comp_wr, sizeof(client_send_comp_wr));
@@ -274,7 +275,7 @@ int client_remote_memory_ops()
                             &bad_client_send_wr);
 
         // rdma write complete
-        ret = process_work_completion_events(io_completion_channel, wc, 2);
+        ret = process_work_completion_events(io_completion_channel, &wc, 1);
         /*
         ret = ibv_post_send(client_qp,
                             &client_send_comp_wr,
@@ -288,6 +289,7 @@ int client_remote_memory_ops()
         ret = ibv_post_recv(client_qp,
                             &server_recv_comp_wr,
                             &bad_server_recv_comp_wr);
+        ret = process_work_completion_events(io_completion_channel, &wc, 1);
 
         bench.benchmark();
     }
@@ -339,6 +341,7 @@ int main(int argc, char *argv[])
     src = NULL;
     src = malloc(args.size);
     memset(src, '1', args.size);
+    dst = malloc(args.size);
     if (!src)
     {
         return -ENOMEM;

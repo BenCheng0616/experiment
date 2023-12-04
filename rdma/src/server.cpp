@@ -349,6 +349,7 @@ int main(int argc, char *argv[])
 
     src = NULL;
     src = malloc(args.size);
+    memset(src, '0', args.size);
     if (!src)
     {
         return -ENOMEM;
@@ -386,7 +387,7 @@ int main(int argc, char *argv[])
     {
         return ret;
     }
-    printf("%d\n", strlen((char *)src));
+    printf("%d\n", (char *)src);
     ret = disconnect_and_cleanup();
     if (ret)
     {
