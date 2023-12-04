@@ -323,7 +323,7 @@ int server_remote_memory_ops()
                       &client_recv_comp_wr,
                       &bad_client_recv_comp_wr);
         process_work_completion_events(io_completion_channel, &wc, 1);
-
+        /*
         ibv_post_send(client_qp,
                       &server_send_wr,
                       &bad_server_send_wr);
@@ -333,6 +333,7 @@ int server_remote_memory_ops()
                       &server_send_comp_wr,
                       &bad_server_send_comp_wr);
         process_work_completion_events(io_completion_channel, &wc, 1);
+        */
     }
     return 0;
 }
