@@ -58,6 +58,29 @@ int client_prepare_connection(struct sockaddr_in *s_addr)
         return -errno;
     }
 
+    ret = rdma_resolve_route(cm_client_id, 2000);
+    if (ret)
+    {
+        return -errno;
+    }
+
+    ret = process_rdma_cm_event(cm_event_channel,
+                                RDMA_CM_EVENT_ROUTE_RESOLVED,
+                                &cm_event);
+    if (ret)
+    {
+        return ret;
+    }
+
+    ret = rdma_ack_cm_event(cm_event);
+    if (ret)
+    {
+        return -errno;
+    }
+    printf("Trying to connect to server at: %s, port %u\n",
+           inet_ntoa(s_addr->sin_addr),
+           ntohs(s_addr->sin_port));
+
     pd = ibv_alloc_pd(cm_client_id->verbs);
     if (!pd)
     {
@@ -139,7 +162,7 @@ int client_connect_to_server()
     {
         return -errno;
     }
-
+    printf("check1\n");
     ret = process_rdma_cm_event(cm_event_channel, RDMA_CM_EVENT_ESTABLISHED, &cm_event);
     if (ret)
     {
