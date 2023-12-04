@@ -299,7 +299,7 @@ int server_remote_memory_ops()
         ret = process_work_completion_events(io_completion_channel, &wc, 1);
     }
     */
-    ret = process_work_completion_events(io_completion_channel, &wc, 1);
+    // ret = process_work_completion_events(io_completion_channel, &wc, 1);
     printf("%s\n", (char *)src);
     return 0;
 }

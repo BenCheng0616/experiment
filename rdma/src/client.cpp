@@ -249,8 +249,8 @@ int client_remote_memory_ops()
         bzero(&client_send_wr, sizeof(client_send_wr));
         client_send_wr.sg_list = &client_send_sge;
         client_send_wr.num_sge = 1;
-        client_send_wr.opcode = IBV_WR_RDMA_WRITE_WITH_IMM;
-        client_send_wr.imm_data = args.size;
+        client_send_wr.opcode = IBV_WR_RDMA_WRITE;
+        // client_send_wr.imm_data = args.size;
         client_send_wr.send_flags = IBV_SEND_SIGNALED;
 
         client_send_wr.wr.rdma.rkey = server_metadata_attr.stag.remote_stag;
@@ -264,8 +264,8 @@ int client_remote_memory_ops()
             return -errno;
         }
         // rdma write complete
-        ret = process_work_completion_events(io_completion_channel, wc, 2);
-        if (ret != 2)
+        ret = process_work_completion_events(io_completion_channel, &wc[0], 1);
+        if (ret != 1)
         {
             return ret;
         }
