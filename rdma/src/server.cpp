@@ -306,17 +306,13 @@ int server_remote_memory_ops()
     bzero(&client_recv_wr, sizeof(client_recv_wr));
     client_recv_comp_wr.sg_list = NULL;
     client_recv_comp_wr.num_sge = 0;
-    ret = ibv_post_recv(client_qp, &client_recv_comp_wr, &bad_client_recv_comp_wr);
+    // ret = ibv_post_recv(client_qp, &client_recv_comp_wr, &bad_client_recv_comp_wr);
     for (i = 0; i < args.count; i++)
     {
         ibv_post_recv(client_qp,
                       &client_recv_comp_wr,
                       &bad_client_recv_comp_wr);
         process_work_completion_events(io_completion_channel, &wc, 1);
-        if (wc.opcode == IBV_WC_RECV_RDMA_WITH_IMM)
-        {
-            printf("RECV WITH IMM\n");
-        }
 
         ibv_post_send(client_qp,
                       &server_send_wr,
