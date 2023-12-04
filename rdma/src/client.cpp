@@ -307,7 +307,7 @@ int main(int argc, char *argv[])
     {
         return ret;
     }
-
+    printf("check\n");
     ret = client_prepare_connection(&server_sockaddr);
     if (ret)
     {
