@@ -312,14 +312,19 @@ int server_remote_memory_ops()
 
         server_send_wr.wr.rdma.rkey = client_metadata_attr.stag.remote_stag;
         server_send_wr.wr.rdma.remote_addr = client_metadata_attr.address;
+
         process_work_completion_events(io_completion_channel, &wc, 1);
+        if (wc.opcode == IBV_WC_RECV_RDMA_WITH_IMM)
+        {
+            printf("recv comp imm data: %d\n", wc.imm_data);
+        }
+        bzero(&client_recv_wr, sizeof(client_recv_wr));
+        client_recv_comp_wr.sg_list = NULL;
+        client_recv_comp_wr.num_sge = 0;
         ibv_post_recv(client_qp,
                       &client_recv_comp_wr,
                       &bad_client_recv_comp_wr);
 
-        bzero(&client_recv_wr, sizeof(client_recv_wr));
-        client_recv_comp_wr.sg_list = NULL;
-        client_recv_comp_wr.num_sge = 0;
         ibv_post_send(client_qp,
                       &server_send_wr,
                       &bad_server_send_wr);

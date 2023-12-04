@@ -290,6 +290,10 @@ int client_remote_memory_ops()
                             &server_recv_comp_wr,
                             &bad_server_recv_comp_wr);
         ret = process_work_completion_events(io_completion_channel, &wc, 1);
+        if (wc.opcode == IBV_WC_RECV_RDMA_WITH_IMM)
+        {
+            printf("recv comp imm data: %d\n", wc.imm_data);
+        }
 
         bench.benchmark();
     }
