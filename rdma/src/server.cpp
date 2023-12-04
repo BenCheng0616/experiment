@@ -312,8 +312,8 @@ int server_remote_memory_ops()
     server_send_comp_wr.send_flags = IBV_SEND_SIGNALED;
 
     bzero(&client_recv_comp_wr, sizeof(client_recv_comp_wr));
-    client_recv_comp_wr.sg_list = NULL;
-    client_recv_comp_wr.num_sge = 0;
+    client_recv_comp_wr.sg_list = &server_send_sge;
+    client_recv_comp_wr.num_sge = 1;
     ibv_post_recv(client_qp,
                   &client_recv_comp_wr,
                   &bad_client_recv_comp_wr);
