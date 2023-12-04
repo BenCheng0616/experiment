@@ -219,7 +219,7 @@ int accept_client_connection()
         return ret;
     }
 
-    bzero(&client_recv_wr, sizeof(client_recv_wr));
+    bzero(&client_recv_comp_wr, sizeof(client_recv_comp_wr));
     client_recv_comp_wr.sg_list = NULL;
     client_recv_comp_wr.num_sge = 0;
     ret = ibv_post_recv(client_qp, &client_recv_comp_wr, &bad_client_recv_comp_wr);
@@ -289,6 +289,19 @@ int server_remote_memory_ops()
     struct ibv_wc wc;
     int ret = -1, i;
 
+    server_send_sge.addr = (uint64_t)server_buffer_mr->addr;
+    server_send_sge.length = (uint32_t)server_buffer_mr->length;
+    server_send_sge.lkey = server_buffer_mr->lkey;
+
+    bzero(&server_send_wr, sizeof(server_send_wr));
+    server_send_wr.sg_list = &server_send_sge;
+    server_send_wr.num_sge = 1;
+    server_send_wr.opcode = IBV_WR_RDMA_WRITE;
+    server_send_wr.send_flags = IBV_SEND_SIGNALED;
+
+    server_send_wr.wr.rdma.rkey = client_metadata_attr.stag.remote_stag;
+    server_send_wr.wr.rdma.remote_addr = client_metadata_attr.address;
+
     bzero(&server_send_comp_wr, sizeof(server_send_comp_wr));
     server_send_wr.sg_list = NULL;
     server_send_wr.num_sge = 0;
@@ -296,31 +309,20 @@ int server_remote_memory_ops()
     server_send_wr.imm_data = args.size;
     server_send_wr.send_flags = IBV_SEND_SIGNALED;
 
+    bzero(&client_recv_comp_wr, sizeof(client_recv_comp_wr));
+    client_recv_comp_wr.sg_list = NULL;
+    client_recv_comp_wr.num_sge = 0;
+    ibv_post_recv(client_qp,
+                  &client_recv_comp_wr,
+                  &bad_client_recv_comp_wr);
     for (i = 0; i < args.count; i++)
     {
-
-        server_send_sge.addr = (uint64_t)server_buffer_mr->addr;
-        server_send_sge.length = (uint32_t)server_buffer_mr->length;
-        server_send_sge.lkey = server_buffer_mr->lkey;
-
-        bzero(&server_send_wr, sizeof(server_send_wr));
-        server_send_wr.sg_list = &server_send_sge;
-        server_send_wr.num_sge = 1;
-        server_send_wr.opcode = IBV_WR_RDMA_WRITE_WITH_IMM;
-        server_send_wr.imm_data = args.size;
-        server_send_wr.send_flags = IBV_SEND_SIGNALED;
-
-        server_send_wr.wr.rdma.rkey = client_metadata_attr.stag.remote_stag;
-        server_send_wr.wr.rdma.remote_addr = client_metadata_attr.address;
 
         process_work_completion_events(io_completion_channel, &wc, 1);
         if (wc.opcode == IBV_WC_RECV_RDMA_WITH_IMM)
         {
-            printf("recv comp imm data: %d\n", wc.imm_data);
+            printf("recv imm data: %d\n", wc.imm_data);
         }
-        bzero(&client_recv_wr, sizeof(client_recv_wr));
-        client_recv_comp_wr.sg_list = NULL;
-        client_recv_comp_wr.num_sge = 0;
         ibv_post_recv(client_qp,
                       &client_recv_comp_wr,
                       &bad_client_recv_comp_wr);
@@ -330,16 +332,11 @@ int server_remote_memory_ops()
                       &bad_server_send_wr);
         process_work_completion_events(io_completion_channel, &wc, 1);
 
-        /*
         ibv_post_send(client_qp,
                       &server_send_comp_wr,
                       &bad_server_send_comp_wr);
         process_work_completion_events(io_completion_channel, &wc, 1);
-        printf("3\n");
-        */
     }
-
-    // printf("test\n");
     return 0;
 }
 
@@ -354,7 +351,6 @@ int main(int argc, char *argv[])
 
     src = NULL;
     src = malloc(args.size);
-    memset(src, '0', args.size);
     if (!src)
     {
         return -ENOMEM;
@@ -392,7 +388,7 @@ int main(int argc, char *argv[])
     {
         return ret;
     }
-    printf("%d\n", (char *)src);
+    printf("%d\n", strlen((char *)src));
     ret = disconnect_and_cleanup();
     if (ret)
     {
