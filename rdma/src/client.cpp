@@ -45,7 +45,7 @@ int client_prepare_connection(struct sockaddr_in *s_addr)
     }
 
     ret = process_rdma_cm_event(cm_event_channel,
-                                RDMA_CM_EVENT_ROUTE_RESOLVED,
+                                RDMA_CM_EVENT_ADDR_RESOLVED,
                                 &cm_event);
     if (ret)
     {
