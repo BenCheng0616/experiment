@@ -259,12 +259,16 @@ int disconnect_and_cleanup()
         return ret;
     }
     ret = rdma_ack_cm_event(cm_event);
+    if (ret)
+    {
+        return -errno;
+    }
     rdma_destroy_qp(cm_client_id);
     ret = rdma_destroy_id(cm_client_id);
     ret = ibv_destroy_cq(cq);
     ret = ibv_destroy_comp_channel(io_completion_channel);
 
-    rdma_buffer_free(server_buffer_mr);
+    rdma_buffer_deregister(server_buffer_mr);
     rdma_buffer_deregister(server_metadata_mr);
     rdma_buffer_deregister(client_metadata_mr);
 
@@ -305,20 +309,26 @@ int server_remote_memory_ops()
     ret = ibv_post_recv(client_qp, &client_recv_comp_wr, &bad_client_recv_comp_wr);
     for (i = 0; i < args.count; i++)
     {
-        ret = ibv_post_recv(client_qp, &client_recv_comp_wr, &bad_client_recv_comp_wr);
-        ret = process_work_completion_events(io_completion_channel, &wc, 1);
+        ibv_post_recv(client_qp,
+                      &client_recv_comp_wr,
+                      &bad_client_recv_comp_wr);
+        process_work_completion_events(io_completion_channel, &wc, 1);
+        if (wc.opcode == IBV_WC_RECV_RDMA_WITH_IMM)
+        {
+            printf("RECV WITH IMM\n");
+        }
 
-        ret = ibv_post_send(client_qp,
-                            &server_send_wr,
-                            &bad_server_send_wr);
-        ret = process_work_completion_events(io_completion_channel, &wc, 1);
-        ret = ibv_post_send(client_qp,
-                            &server_send_comp_wr,
-                            &bad_server_send_comp_wr);
-        ret = process_work_completion_events(io_completion_channel, &wc, 1);
+        ibv_post_send(client_qp,
+                      &server_send_wr,
+                      &bad_server_send_wr);
+        process_work_completion_events(io_completion_channel, &wc, 1);
+        ibv_post_send(client_qp,
+                      &server_send_comp_wr,
+                      &bad_server_send_comp_wr);
+        process_work_completion_events(io_completion_channel, &wc, 1);
     }
 
-    // printf("%s\n", (char *)src);
+    // printf("test\n");
     return 0;
 }
 
@@ -370,7 +380,7 @@ int main(int argc, char *argv[])
     {
         return ret;
     }
-    printf("test\n");
+    printf("%d\n", strlen((char *)src));
     ret = disconnect_and_cleanup();
     if (ret)
     {
