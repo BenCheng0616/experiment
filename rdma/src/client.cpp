@@ -295,7 +295,7 @@ int main(int argc, char *argv[])
 
     src = NULL;
     src = malloc(args.size);
-    memset(&src, '1', args.size);
+    memset(src, '1', args.size);
     if (!src)
     {
         return -ENOMEM;
