@@ -242,7 +242,7 @@ int client_remote_memory_ops()
             return -errno;
         }
         // rdma write complete
-        ret = process_work_completion_events(io_completion_channel, &wc, 2);
+        ret = process_work_completion_events(io_completion_channel, wc, 2);
         if (ret != 2)
         {
             return ret;
