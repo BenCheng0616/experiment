@@ -18,6 +18,7 @@ struct rdma_buffer_attr client_metadata_attr, server_metadata_attr;
 struct ibv_send_wr client_send_wr, *bad_client_send_wr = NULL;
 struct ibv_send_wr client_send_comp_wr, *bad_client_send_comp_wr = NULL;
 struct ibv_recv_wr server_recv_wr, *bad_server_recv_wr = NULL;
+struct ibv_recv_wr server_recv_comp_wr, *bad_server_recv_comp_wr = NULL;
 struct ibv_sge client_send_sge, server_recv_sge;
 Arguments args;
 void *src = NULL;
@@ -245,7 +246,6 @@ int client_remote_memory_ops()
     client_send_wr.sg_list = &client_send_sge;
     client_send_wr.num_sge = 1;
     client_send_wr.opcode = IBV_WR_RDMA_WRITE;
-    client_send_wr.imm_data = args.size;
     client_send_wr.send_flags = IBV_SEND_SIGNALED;
 
     client_send_wr.wr.rdma.rkey = server_metadata_attr.stag.remote_stag;
@@ -257,6 +257,10 @@ int client_remote_memory_ops()
     client_send_comp_wr.opcode = IBV_WR_RDMA_WRITE_WITH_IMM;
     client_send_comp_wr.imm_data = args.size;
     client_send_comp_wr.send_flags = IBV_SEND_SIGNALED;
+
+    bzero(&server_recv_comp_wr, sizeof(server_recv_comp_wr));
+    server_recv_comp_wr.sg_list = NULL;
+    server_recv_comp_wr.num_sge = 0;
 
     Benchmark bench(&args);
     for (i = 0; i < args.count; i++)
@@ -276,6 +280,10 @@ int client_remote_memory_ops()
         ret = ibv_post_send(client_qp,
                             &client_send_comp_wr,
                             &bad_client_send_comp_wr);
+
+        ret = ibv_post_recv(client_qp,
+                            &server_recv_comp_wr,
+                            &bad_server_recv_comp_wr);
         bench.benchmark();
     }
     bench.evaluate(&args);
