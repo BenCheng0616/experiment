@@ -298,9 +298,9 @@ int server_remote_memory_ops()
     bzero(&server_send_wr, sizeof(server_send_wr));
     server_send_wr.sg_list = &server_send_sge;
     server_send_wr.num_sge = 1;
-    server_send_wr.opcode = IBV_WR_RDMA_WRITE_WITH_IMM;
-    server_send_wr.imm_data = args.size;
+    server_send_wr.opcode = IBV_WR_RDMA_WRITE;
     server_send_wr.send_flags = IBV_SEND_SIGNALED;
+
     server_send_wr.wr.rdma.rkey = client_metadata_attr.stag.remote_stag;
     server_send_wr.wr.rdma.remote_addr = client_metadata_attr.address;
 
@@ -312,8 +312,8 @@ int server_remote_memory_ops()
     server_send_comp_wr.send_flags = IBV_SEND_SIGNALED;
 
     bzero(&client_recv_comp_wr, sizeof(client_recv_comp_wr));
-    client_recv_comp_wr.sg_list = &server_send_sge;
-    client_recv_comp_wr.num_sge = 1;
+    client_recv_comp_wr.sg_list = NULL;
+    client_recv_comp_wr.num_sge = 0;
     ibv_post_recv(client_qp,
                   &client_recv_comp_wr,
                   &bad_client_recv_comp_wr);
@@ -328,12 +328,11 @@ int server_remote_memory_ops()
                       &server_send_wr,
                       &bad_server_send_wr);
         process_work_completion_events(io_completion_channel, &wc, 1);
-        /*
-                ibv_post_send(client_qp,
-                              &server_send_comp_wr,
-                              &bad_server_send_comp_wr);
-                process_work_completion_events(io_completion_channel, &wc, 1);
-                */
+
+        ibv_post_send(client_qp,
+                      &server_send_comp_wr,
+                      &bad_server_send_comp_wr);
+        process_work_completion_events(io_completion_channel, &wc, 1);
     }
     return 0;
 }
