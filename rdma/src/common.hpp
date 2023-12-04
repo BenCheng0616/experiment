@@ -55,7 +55,7 @@ void show_rdma_buffer_attr(struct rdma_buffer_attr *attr)
     printf("buffer attr, addr: %p, len: %u, stag: 0x%x \n",
            (void *)attr->address,
            (unsigned int)attr->length,
-           attr->stag.local_stag);
+           attr->stag.remote_stag);
     printf("-----------------------------------\n");
 }
 

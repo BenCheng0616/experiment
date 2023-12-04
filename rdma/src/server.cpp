@@ -68,7 +68,6 @@ int setup_client_resouces()
     {
         return -errno;
     }
-
     client_qp = cm_client_id->qp;
     return ret;
 }
@@ -148,11 +147,12 @@ int server_xchange_metadata_with_client()
 
     server_metadata_attr.address = (uint64_t)server_buffer_mr->addr;
     server_metadata_attr.length = (uint64_t)server_buffer_mr->length;
-    server_metadata_attr.stag.local_stag = server_buffer_mr->rkey;
+    server_metadata_attr.stag.local_stag = server_buffer_mr->lkey;
     server_metadata_mr = rdma_buffer_register(pd,
                                               &server_metadata_attr,
                                               sizeof(server_metadata_attr),
                                               IBV_ACCESS_LOCAL_WRITE);
+    show_rdma_buffer_attr(&server_metadata_attr);
     if (!server_metadata_mr)
     {
         return -ENOMEM;
@@ -188,7 +188,7 @@ int accept_client_connection()
     struct sockaddr_in remote_sockaddr;
     int ret = -1;
 
-    if (!cm_client_id || client_qp)
+    if (!cm_client_id || !client_qp)
     {
         return -EINVAL;
     }
@@ -200,6 +200,7 @@ int accept_client_connection()
     {
         return -ENOMEM;
     }
+
     client_recv_sge.addr = (uint64_t)client_metadata_mr->addr;
     client_recv_sge.length = client_metadata_mr->length;
     client_recv_sge.lkey = client_metadata_mr->lkey;
@@ -218,11 +219,13 @@ int accept_client_connection()
     memset(&conn_param, 0, sizeof(conn_param));
     conn_param.initiator_depth = 3;
     conn_param.responder_resources = 3;
+
     ret = rdma_accept(cm_client_id, &conn_param);
     if (ret)
     {
         return -errno;
     }
+
     ret = process_rdma_cm_event(cm_event_channel,
                                 RDMA_CM_EVENT_ESTABLISHED,
                                 &cm_event);
@@ -235,6 +238,7 @@ int accept_client_connection()
     {
         return -errno;
     }
+
     memcpy(&remote_sockaddr,
            rdma_get_peer_addr(cm_client_id), sizeof(struct sockaddr_in));
     printf("A new connection is accepted from %s\n", inet_ntoa(remote_sockaddr.sin_addr));
@@ -271,6 +275,7 @@ int server_remote_memory_ops()
 {
     struct ibv_wc wc;
     int ret = -1, i;
+    /*
     for (i = 0; i < args.count; i++)
     {
         ret = process_work_completion_events(io_completion_channel, &wc, 1);
@@ -293,6 +298,9 @@ int server_remote_memory_ops()
                             &bad_server_send_wr);
         ret = process_work_completion_events(io_completion_channel, &wc, 1);
     }
+    */
+    ret = process_work_completion_events(io_completion_channel, &wc, 1);
+    printf("%s\n", (char *)src);
     return 0;
 }
 
@@ -311,7 +319,7 @@ int main(int argc, char *argv[])
     {
         return -ENOMEM;
     }
-    printf("check\n");
+
     ret = get_addr(args.ip, (struct sockaddr *)&server_sockaddr);
     if (ret)
     {
