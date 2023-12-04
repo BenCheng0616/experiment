@@ -218,6 +218,12 @@ int accept_client_connection()
     {
         return ret;
     }
+
+    bzero(&client_recv_wr, sizeof(client_recv_wr));
+    client_recv_comp_wr.sg_list = NULL;
+    client_recv_comp_wr.num_sge = 0;
+    ret = ibv_post_recv(client_qp, &client_recv_comp_wr, &bad_client_recv_comp_wr);
+
     memset(&conn_param, 0, sizeof(conn_param));
     conn_param.initiator_depth = 3;
     conn_param.responder_resources = 3;
@@ -303,16 +309,13 @@ int server_remote_memory_ops()
     server_send_wr.imm_data = args.size;
     server_send_wr.send_flags = IBV_SEND_SIGNALED;
 
-    bzero(&client_recv_wr, sizeof(client_recv_wr));
-    client_recv_comp_wr.sg_list = NULL;
-    client_recv_comp_wr.num_sge = 0;
-    // ret = ibv_post_recv(client_qp, &client_recv_comp_wr, &bad_client_recv_comp_wr);
     for (i = 0; i < args.count; i++)
     {
+
+        process_work_completion_events(io_completion_channel, &wc, 1);
         ibv_post_recv(client_qp,
                       &client_recv_comp_wr,
                       &bad_client_recv_comp_wr);
-        process_work_completion_events(io_completion_channel, &wc, 1);
 
         ibv_post_send(client_qp,
                       &server_send_wr,

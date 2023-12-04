@@ -155,10 +155,18 @@ int client_connect_to_server()
     struct rdma_conn_param conn_param;
     struct rdma_cm_event *cm_event = NULL;
     int ret = -1;
+
+    bzero(&server_recv_comp_wr, sizeof(server_recv_comp_wr));
+    server_recv_comp_wr.sg_list = NULL;
+    server_recv_comp_wr.num_sge = 0;
+
+    ret = ibv_post_recv(client_qp, &server_recv_comp_wr, &bad_server_recv_comp_wr);
+
     bzero(&conn_param, sizeof(conn_param));
     conn_param.initiator_depth = 3;
     conn_param.responder_resources = 3;
     conn_param.retry_count = 3;
+
     ret = rdma_connect(cm_client_id, &conn_param);
     if (ret)
     {
@@ -258,11 +266,6 @@ int client_remote_memory_ops()
     client_send_comp_wr.imm_data = args.size;
     client_send_comp_wr.send_flags = IBV_SEND_SIGNALED;
 
-    bzero(&server_recv_comp_wr, sizeof(server_recv_comp_wr));
-    server_recv_comp_wr.sg_list = NULL;
-    server_recv_comp_wr.num_sge = 0;
-
-    // ret = ibv_post_recv(client_qp, &server_recv_comp_wr, &bad_server_recv_comp_wr);
     Benchmark bench(&args);
     for (i = 0; i < args.count; i++)
     {
@@ -281,11 +284,10 @@ int client_remote_memory_ops()
 
         ret = process_work_completion_events(io_completion_channel, &wc, 1);
 
+        ret = process_work_completion_events(io_completion_channel, &wc, 1);
         ret = ibv_post_recv(client_qp,
                             &server_recv_comp_wr,
                             &bad_server_recv_comp_wr);
-
-        ret = process_work_completion_events(io_completion_channel, &wc, 1);
 
         bench.benchmark();
     }
