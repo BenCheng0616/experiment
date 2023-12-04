@@ -289,20 +289,6 @@ int server_remote_memory_ops()
     struct ibv_wc wc;
     int ret = -1, i;
 
-    server_send_sge.addr = (uint64_t)server_buffer_mr->addr;
-    server_send_sge.length = (uint32_t)server_buffer_mr->length;
-    server_send_sge.lkey = server_buffer_mr->lkey;
-
-    bzero(&server_send_wr, sizeof(server_send_wr));
-    server_send_wr.sg_list = &server_send_sge;
-    server_send_wr.num_sge = 1;
-    server_send_wr.opcode = IBV_WR_RDMA_WRITE_WITH_IMM;
-    server_send_wr.imm_data = args.size;
-    server_send_wr.send_flags = IBV_SEND_SIGNALED;
-
-    server_send_wr.wr.rdma.rkey = client_metadata_attr.stag.remote_stag;
-    server_send_wr.wr.rdma.remote_addr = client_metadata_attr.address;
-
     bzero(&server_send_comp_wr, sizeof(server_send_comp_wr));
     server_send_wr.sg_list = NULL;
     server_send_wr.num_sge = 0;
@@ -313,16 +299,32 @@ int server_remote_memory_ops()
     for (i = 0; i < args.count; i++)
     {
 
+        server_send_sge.addr = (uint64_t)server_buffer_mr->addr;
+        server_send_sge.length = (uint32_t)server_buffer_mr->length;
+        server_send_sge.lkey = server_buffer_mr->lkey;
+
+        bzero(&server_send_wr, sizeof(server_send_wr));
+        server_send_wr.sg_list = &server_send_sge;
+        server_send_wr.num_sge = 1;
+        server_send_wr.opcode = IBV_WR_RDMA_WRITE_WITH_IMM;
+        server_send_wr.imm_data = args.size;
+        server_send_wr.send_flags = IBV_SEND_SIGNALED;
+
+        server_send_wr.wr.rdma.rkey = client_metadata_attr.stag.remote_stag;
+        server_send_wr.wr.rdma.remote_addr = client_metadata_attr.address;
         process_work_completion_events(io_completion_channel, &wc, 1);
         ibv_post_recv(client_qp,
                       &client_recv_comp_wr,
                       &bad_client_recv_comp_wr);
-        printf("1\n");
+
+        bzero(&client_recv_wr, sizeof(client_recv_wr));
+        client_recv_comp_wr.sg_list = NULL;
+        client_recv_comp_wr.num_sge = 0;
         ibv_post_send(client_qp,
                       &server_send_wr,
                       &bad_server_send_wr);
         process_work_completion_events(io_completion_channel, &wc, 1);
-        printf("2\n");
+
         /*
         ibv_post_send(client_qp,
                       &server_send_comp_wr,
