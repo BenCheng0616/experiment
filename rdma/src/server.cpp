@@ -148,7 +148,7 @@ int server_xchange_metadata_with_client()
 
     server_metadata_attr.address = (uint64_t)server_buffer_mr->addr;
     server_metadata_attr.length = (uint64_t)server_buffer_mr->length;
-    server_metadata_attr.stag.local_stag = server_buffer_mr->lkey;
+    server_metadata_attr.stag.local_stag = server_buffer_mr->rkey;
     server_metadata_mr = rdma_buffer_register(pd,
                                               &server_metadata_attr,
                                               sizeof(server_metadata_attr),
