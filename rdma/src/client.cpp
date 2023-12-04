@@ -244,7 +244,7 @@ int client_xchange_metadata_with_server()
 
 int client_remote_memory_ops()
 {
-    struct ibv_wc wc;
+    struct ibv_wc wc[2];
     int ret = -1, i;
 
     client_send_sge.addr = (uint64_t)client_src_mr->addr;
@@ -253,7 +253,8 @@ int client_remote_memory_ops()
 
     client_send_wr.sg_list = &client_send_sge;
     client_send_wr.num_sge = 1;
-    client_send_wr.opcode = IBV_WR_RDMA_WRITE;
+    client_send_wr.opcode = IBV_WR_RDMA_WRITE_WITH_IMM;
+    client_send_wr.imm_data = args.size;
     client_send_wr.send_flags = IBV_SEND_SIGNALED;
 
     client_send_wr.wr.rdma.rkey = server_metadata_attr.stag.remote_stag;
@@ -276,15 +277,14 @@ int client_remote_memory_ops()
                             &bad_client_send_wr);
 
         // rdma write complete
-        ret = process_work_completion_events(io_completion_channel, &wc, 1);
-
+        ret = process_work_completion_events(io_completion_channel, wc, 2);
+        /*
         ret = ibv_post_send(client_qp,
                             &client_send_comp_wr,
                             &bad_client_send_comp_wr);
 
-        ret = process_work_completion_events(io_completion_channel, &wc, 1);
-
-        ret = process_work_completion_events(io_completion_channel, &wc, 1);
+        ret = process_work_completion_events(io_completion_channel, wc, 2);
+        */
         ret = ibv_post_recv(client_qp,
                             &server_recv_comp_wr,
                             &bad_server_recv_comp_wr);
