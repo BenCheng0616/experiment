@@ -14,6 +14,7 @@ struct ibv_mr *client_metadata_mr = NULL,
 struct rdma_buffer_attr client_metadata_attr, server_metadata_attr;
 struct ibv_send_wr server_send_wr, *bad_server_send_wr = NULL;
 struct ibv_recv_wr client_recv_wr, *bad_client_recv_wr = NULL;
+struct ibv_recv_wr client_recv_comp_wr, *bad_client_recv_comp_wr = NULL;
 struct ibv_sge client_recv_sge, server_send_sge;
 Arguments args;
 void *src = NULL;
@@ -275,13 +276,10 @@ int server_remote_memory_ops()
 {
     struct ibv_wc wc;
     int ret = -1, i;
-    client_recv_sge.addr = (uint64_t)server_buffer_mr->addr;
-    client_recv_sge.length = server_buffer_mr->length;
-    client_recv_sge.lkey = server_buffer_mr->lkey;
     bzero(&client_recv_wr, sizeof(client_recv_wr));
-    client_recv_wr.sg_list = &client_recv_sge;
-    client_recv_wr.num_sge = 1;
-    ret = ibv_post_recv(client_qp, &client_recv_wr, &bad_client_recv_wr);
+    client_recv_comp_wr.sg_list = NULL;
+    client_recv_comp_wr.num_sge = 0;
+    ret = ibv_post_recv(client_qp, &client_recv_comp_wr, &bad_client_recv_comp_wr);
     /*
     for (i = 0; i < args.count; i++)
     {
@@ -307,7 +305,7 @@ int server_remote_memory_ops()
     }
     */
     ret = process_work_completion_events(io_completion_channel, &wc, 1);
-    printf("%s\n", (char *)src);
+    // printf("%s\n", (char *)src);
     return 0;
 }
 
@@ -365,6 +363,5 @@ int main(int argc, char *argv[])
         return ret;
     }
 
-    printf("%s", src);
     return 0;
 }
