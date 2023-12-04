@@ -301,12 +301,12 @@ int main(int argc, char *argv[])
         return -ENOMEM;
     }
 
-    server_sockaddr.sin_port = htons(args.port);
     ret = get_addr(args.ip, (struct sockaddr *)&server_sockaddr);
     if (ret)
     {
         return ret;
     }
+    server_sockaddr.sin_port = htons(args.port);
     printf("check\n");
     ret = client_prepare_connection(&server_sockaddr);
     if (ret)
