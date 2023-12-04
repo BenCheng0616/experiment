@@ -19,8 +19,7 @@ struct ibv_send_wr client_send_wr, *bad_client_send_wr = NULL;
 struct ibv_recv_wr server_recv_wr, *bad_server_recv_wr = NULL;
 struct ibv_sge client_send_sge, server_recv_sge;
 Arguments args;
-
-char *src = NULL;
+void *src = NULL;
 
 int client_prepare_connection(struct sockaddr_in *s_addr)
 {
@@ -162,7 +161,7 @@ int client_xchange_metadata_with_server()
     int ret = -1;
     client_src_mr = rdma_buffer_register(pd,
                                          src,
-                                         strlen(src),
+                                         args.size,
                                          (enum ibv_access_flags)(IBV_ACCESS_LOCAL_WRITE |
                                                                  IBV_ACCESS_REMOTE_READ |
                                                                  IBV_ACCESS_REMOTE_WRITE));
@@ -295,8 +294,8 @@ int main(int argc, char *argv[])
     parseArguments(&args, argc, argv);
 
     src = NULL;
-    src = (char *)calloc(args.size, sizeof(char));
-    memset(&src, 1, args.size);
+    src = malloc(args.size);
+    memset(&src, '1', args.size);
     if (!src)
     {
         return -ENOMEM;
