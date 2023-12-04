@@ -1,237 +1,356 @@
-#include <iostream>
-#include <string.h>
-#include <netdb.h>
-#include <stdlib.h>
-#include <unistd.h>
-#include <byteswap.h>
-#include <rdma/rdma_cma.h>
-#include <rdma/rdma_verbs.h>
-
 #include "parseargs.hpp"
+#include "common.hpp"
 
-typedef struct pdata
+struct rdma_event_channel *cm_event_channel = NULL;
+struct rdma_cm_id *cm_server_id = NULL, *cm_client_id = NULL;
+struct ibv_pd *pd = NULL;
+struct ibv_comp_channel *io_completion_channel = NULL;
+struct ibv_cq *cq = NULL;
+struct ibv_qp_init_attr qp_init_attr;
+struct ibv_qp *client_qp;
+struct ibv_mr *client_metadata_mr = NULL,
+              *server_buffer_mr = NULL,
+              *server_metadata_mr = NULL;
+struct rdma_buffer_attr client_metadata_attr, server_metadata_attr;
+struct ibv_send_wr server_send_wr, *bad_server_send_wr = NULL;
+struct ibv_recv_wr client_recv_wr, *bad_client_recv_wr = NULL;
+struct ibv_sge client_recv_sge, server_send_sge;
+Arguments args;
+
+char *src = NULL;
+
+int setup_client_resouces()
 {
-    uint64_t buf_va;
-    uint32_t buf_rkey;
-} pdata;
+    int ret = -1;
+    if (!cm_client_id)
+    {
+        return -EINVAL;
+    }
+    pd = ibv_alloc_pd(cm_client_id->verbs);
+    if (!pd)
+    {
+        return -errno;
+    }
 
-class Server
+    io_completion_channel = ibv_create_comp_channel(cm_client_id->verbs);
+    if (!io_completion_channel)
+    {
+        return -errno;
+    }
+
+    cq = ibv_create_cq(cm_client_id->verbs,
+                       CQ_CAPACITY,
+                       NULL,
+                       io_completion_channel,
+                       0);
+    if (!cq)
+    {
+        return -errno;
+    }
+
+    ret = ibv_req_notify_cq(cq, 0);
+    if (ret)
+    {
+        return errno;
+    }
+
+    bzero(&qp_init_attr, sizeof(qp_init_attr));
+    qp_init_attr.cap.max_recv_sge = MAX_SGE;
+    qp_init_attr.cap.max_recv_wr = MAX_WR;
+    qp_init_attr.cap.max_send_sge = MAX_SGE;
+    qp_init_attr.cap.max_send_wr = MAX_WR;
+    qp_init_attr.qp_type = IBV_QPT_RC;
+
+    qp_init_attr.recv_cq = cq;
+    qp_init_attr.send_cq = cq;
+
+    ret = rdma_create_qp(cm_client_id, pd, &qp_init_attr);
+    if (ret)
+    {
+        return -errno;
+    }
+
+    client_qp = cm_client_id->qp;
+    return ret;
+}
+
+int start_rdma_server(struct sockaddr_in *server_addr)
 {
-public:
-    Server(Arguments *args)
+    struct rdma_cm_event *cm_event = NULL;
+    int ret = -1;
+    cm_event_channel = rdma_create_event_channel();
+    if (!cm_event_channel)
     {
-        this->args = args;
-        buffer = malloc(args->size);
-        memset(buffer, '1', args->size);
+        return -errno;
     }
 
-    ~Server()
+    ret = rdma_create_id(cm_event_channel, &cm_server_id, NULL, RDMA_PS_TCP);
+    if (ret)
     {
+        return -errno;
     }
 
-    void init()
+    ret = rdma_bind_addr(cm_server_id, (struct sockaddr *)server_addr);
+    if (ret)
     {
-        int err;
-        ec = rdma_create_event_channel();
-        if (!ec)
-        {
-            fprintf(stderr, "create event channel error.\n");
-            return;
-        }
-
-        err = rdma_create_id(ec, &server, NULL, RDMA_PS_TCP);
-        if (err)
-        {
-            fprintf(stderr, "create cm id failed.\n");
-            return;
-        }
-
-        sin.sin_family = AF_INET;
-        sin.sin_port = htons(args->port);
-        sin.sin_addr.s_addr = INADDR_ANY;
-
-        err = rdma_bind_addr(server, (struct sockaddr *)&sin);
-        if (err)
-        {
-            fprintf(stderr, "cannot bind addr.\n");
-            return;
-        }
-
-        err = rdma_listen(server, 1);
-        if (err)
-        {
-            fprintf(stderr, "server listen failed.\n");
-        }
+        return -errno;
     }
 
-    void waitforClient()
+    ret = rdma_listen(cm_server_id, 5);
+    if (ret)
     {
-        int err;
-        pdata repdata;
-        err = rdma_get_cm_event(ec, &event);
-        if (err)
-        {
-            fprintf(stderr, "rdma get cm event failed.\n");
-            return;
-        }
-        if (event->event != RDMA_CM_EVENT_CONNECT_REQUEST)
-            return;
+        return -errno;
+    }
+    printf("Server is listening at: %s, port %d\n",
+           inet_ntoa(server_addr->sin_addr),
+           ntohs(server_addr->sin_port));
 
-        client = event->id;
-        memcpy(&client_pdata, event->param.conn.private_data, sizeof(client_pdata));
-        rdma_ack_cm_event(event);
-
-        pd = ibv_alloc_pd(client->verbs);
-        if (!pd)
-        {
-            fprintf(stderr, "alloc pd failed.\n");
-            return;
-        }
-
-        cc = ibv_create_comp_channel(client->verbs);
-        if (!cc)
-        {
-            fprintf(stderr, "create comp channel failed.\n");
-            return;
-        }
-        cq = ibv_create_cq(client->verbs, 512, NULL, cc, 0);
-        if (!cq)
-        {
-            fprintf(stderr, "cannot create cq.\n");
-            return;
-        }
-
-        if (ibv_req_notify_cq(cq, 0))
-            return;
-
-        mr = rdma_reg_write(client, buffer, args->size);
-        // mr = ibv_reg_mr(pd, buffer, args->size, IBV_ACCESS_LOCAL_WRITE | IBV_ACCESS_REMOTE_WRITE);
-        if (!mr)
-        {
-            fprintf(stderr, "register memory region failed.\n");
-            return;
-        }
-
-        memset(&qp_attr, 0, sizeof(qp_attr));
-        qp_attr.cap.max_send_wr = args->size;
-        qp_attr.cap.max_send_sge = 1;
-        qp_attr.cap.max_recv_wr = args->size;
-        qp_attr.cap.max_recv_sge = 1;
-
-        qp_attr.send_cq = cq;
-        qp_attr.recv_cq = cq;
-        qp_attr.qp_type = IBV_QPT_RC;
-
-        err = rdma_create_qp(client, pd, &qp_attr);
-        if (err)
-        {
-            fprintf(stderr, "rdma cm create qp error.\n");
-            return;
-        }
-        repdata.buf_va = bswap_64((uintptr_t)buffer);
-        repdata.buf_rkey = htonl(mr->rkey);
-        conn_param.responder_resources = 1;
-        conn_param.private_data = &repdata;
-        conn_param.private_data_len = sizeof(repdata);
-
-        err = rdma_accept(client, &conn_param);
-        if (err)
-            return;
-        err = rdma_get_cm_event(ec, &event);
-        if (err)
-        {
-            fprintf(stderr, "rdma get cm event failed.\n");
-        }
-        if (event->event != RDMA_CM_EVENT_ESTABLISHED)
-            return;
-        std::cout << bswap_64(repdata.buf_va) << "," << ntohl(repdata.buf_rkey) << "\n";
-        rdma_ack_cm_event(event);
+    ret = process_rdma_cm_event(cm_event_channel,
+                                RDMA_CM_EVENT_CONNECT_REQUEST,
+                                &cm_event);
+    if (ret)
+    {
+        return ret;
     }
 
-    void communicate()
+    cm_client_id = cm_event->id;
+
+    ret = rdma_ack_cm_event(cm_event);
+    if (ret)
     {
-        int num_comp;
-        uint8_t *notification = (uint8_t *)calloc(1, sizeof(uint8_t));
-        struct ibv_mr *mr_notify = rdma_reg_msgs(client, notification, sizeof(uint8_t));
-        // struct ibv_mr *mr_notify = ibv_reg_mr(pd, notification, sizeof(uint8_t), IBV_ACCESS_LOCAL_WRITE);
-        // rdma_post_recv(client, NULL, notification, sizeof(uint8_t), mr_notify);
-        for (int count = 0; count < args->count; ++count)
-        {
-            // ibv_get_cq_event(cc, &evt_cq, &cq_context);
-            // ibv_ack_cq_events(cq, 1);
-            rdma_post_recv(client, NULL, buffer, args->size, mr);
-            ibv_get_cq_event(cc, &evt_cq, &cq_context);
-            ibv_req_notify_cq(cq, 0);
-            ibv_poll_cq(cq, 1, &wc);
-
-            rdma_post_send(client, NULL, buffer, args->size, mr, 0);
-            ibv_get_cq_event(cc, &evt_cq, &cq_context);
-            ibv_req_notify_cq(cq, 0);
-            ibv_poll_cq(cq, 1, &wc);
-            // ibv_get_cq_event(cc, &evt_cq, &cq_context);
-            // ibv_ack_cq_events(cq, 1);
-            /*
-            rdma_get_recv_comp(client, &wc);
-            rdma_post_recv(client, NULL, notification, sizeof(uint8_t), mr_notify);
-            // get write-in complete notification
-            std::cout << "16\n";
-            // write to remote host
-            rdma_post_write(client, NULL, buffer, args->size, mr, IBV_SEND_SIGNALED, bswap_64(client_pdata.buf_va), ntohl(client_pdata.buf_rkey));
-            // ibv_post_send(client->qp, &send_wr, &bad_send_wr);
-
-            rdma_get_send_comp(client, &wc); // stock until rdma write complete
-            // notify remote host memory write complete
-
-            rdma_post_send(client, NULL, notification, sizeof(uint8_t), mr_notify, IBV_SEND_SIGNALED);
-            // ibv_post_send(client->qp, &send_wr_notify, &bad_send_wr_notify);
-            rdma_get_send_comp(client, &wc);
-            */
-        }
-        std::cout << strlen((char *)buffer) << "\n";
+        return -errno;
     }
+    return ret;
+}
 
-    void stop()
-    {
-        int err = rdma_get_cm_event(ec, &event);
-        if (event->event == RDMA_CM_EVENT_DISCONNECTED)
-        {
-            rdma_destroy_qp(client);
-            rdma_dereg_mr(mr);
-            free(buffer);
-            rdma_destroy_id(server);
-        }
-        rdma_destroy_event_channel(ec);
-    }
-
-private:
-    void *buffer;
-    Arguments *args;
-    struct rdma_event_channel *ec = NULL;
-    struct rdma_cm_event *event = NULL;
-    struct rdma_cm_id *server = NULL;
-    struct rdma_cm_id *client = NULL;
-    struct rdma_conn_param conn_param = {};
-    struct ibv_pd *pd;
-    struct ibv_comp_channel *cc;
-    struct ibv_cq *cq;
-    struct ibv_cq *evt_cq;
-    struct ibv_mr *mr;
-    struct ibv_qp_init_attr qp_attr = {};
+int server_xchange_metadata_with_client()
+{
     struct ibv_wc wc;
-    struct sockaddr_in sin;
-    void *cq_context;
-    pdata client_pdata;
-};
+    int ret = -1;
+    ret = process_work_completion_events(io_completion_channel, &wc, 1);
+    if (ret != 1)
+    {
+        return ret;
+    }
+    printf("Client side buffer information recieved...\n");
+    show_rdma_buffer_attr(&client_metadata_attr);
+
+    server_buffer_mr = rdma_buffer_register(pd,
+                                            src,
+                                            strlen(src),
+                                            (enum ibv_access_flags)(IBV_ACCESS_LOCAL_WRITE |
+                                                                    IBV_ACCESS_REMOTE_READ |
+                                                                    IBV_ACCESS_REMOTE_WRITE));
+
+    if (!server_buffer_mr)
+    {
+        return -ENOMEM;
+    }
+
+    server_metadata_attr.address = (uint64_t)server_buffer_mr->addr;
+    server_metadata_attr.length = (uint64_t)server_buffer_mr->length;
+    server_metadata_attr.stag.local_stag = server_buffer_mr->rkey;
+    server_metadata_mr = rdma_buffer_register(pd,
+                                              &server_metadata_attr,
+                                              sizeof(server_metadata_attr),
+                                              IBV_ACCESS_LOCAL_WRITE);
+    if (!server_metadata_mr)
+    {
+        return -ENOMEM;
+    }
+
+    server_send_sge.addr = (uint64_t)&server_metadata_attr;
+    server_send_sge.length = sizeof(server_metadata_attr);
+    server_send_sge.lkey = server_metadata_mr->lkey;
+    bzero(&server_send_wr, sizeof(server_send_wr));
+    server_send_wr.sg_list = &server_send_sge;
+    server_send_wr.num_sge = 1;
+    server_send_wr.opcode = IBV_WR_SEND;
+    server_send_wr.send_flags = IBV_SEND_SIGNALED;
+
+    ret = ibv_post_send(client_qp, &server_send_wr, &bad_server_send_wr);
+    if (ret)
+    {
+        return -errno;
+    }
+
+    ret = process_work_completion_events(io_completion_channel, &wc, 1);
+    if (ret != 1)
+    {
+        return ret;
+    }
+    return 0;
+}
+
+int accept_client_connection()
+{
+    struct rdma_conn_param conn_param;
+    struct rdma_cm_event *cm_event = NULL;
+    struct sockaddr_in remote_sockaddr;
+    int ret = -1;
+
+    if (!cm_client_id || client_qp)
+    {
+        return -EINVAL;
+    }
+    client_metadata_mr = rdma_buffer_register(pd,
+                                              &client_metadata_attr,
+                                              sizeof(client_metadata_attr),
+                                              (IBV_ACCESS_LOCAL_WRITE));
+    if (!client_metadata_mr)
+    {
+        return -ENOMEM;
+    }
+    client_recv_sge.addr = (uint64_t)client_metadata_mr->addr;
+    client_recv_sge.length = client_metadata_mr->length;
+    client_recv_sge.lkey = client_metadata_mr->lkey;
+    bzero(&client_recv_wr, sizeof(client_recv_wr));
+    client_recv_wr.sg_list = &client_recv_sge;
+    client_recv_wr.num_sge = 1;
+
+    ret = ibv_post_recv(client_qp,
+                        &client_recv_wr,
+                        &bad_client_recv_wr);
+
+    if (ret)
+    {
+        return ret;
+    }
+    memset(&conn_param, 0, sizeof(conn_param));
+    conn_param.initiator_depth = 3;
+    conn_param.responder_resources = 3;
+    ret = rdma_accept(cm_client_id, &conn_param);
+    if (ret)
+    {
+        return -errno;
+    }
+    ret = process_rdma_cm_event(cm_event_channel,
+                                RDMA_CM_EVENT_ESTABLISHED,
+                                &cm_event);
+    if (ret)
+    {
+        return -errno;
+    }
+    ret = rdma_ack_cm_event(cm_event);
+    if (ret)
+    {
+        return -errno;
+    }
+    memcpy(&remote_sockaddr,
+           rdma_get_peer_addr(cm_client_id), sizeof(struct sockaddr_in));
+    printf("A new connection is accepted from %s\n", inet_ntoa(remote_sockaddr.sin_addr));
+    return ret;
+}
+
+int disconnect_and_cleanup()
+{
+    struct rdma_cm_event *cm_event = NULL;
+    int ret = -1;
+    ret = process_rdma_cm_event(cm_event_channel,
+                                RDMA_CM_EVENT_DISCONNECTED,
+                                &cm_event);
+    if (ret)
+    {
+        return ret;
+    }
+    rdma_destroy_qp(cm_client_id);
+    ret = rdma_destroy_id(cm_client_id);
+    ret = ibv_destroy_cq(cq);
+    ret = ibv_destroy_comp_channel(io_completion_channel);
+
+    rdma_buffer_free(server_buffer_mr);
+    rdma_buffer_deregister(server_metadata_mr);
+    rdma_buffer_deregister(client_metadata_mr);
+
+    ret = ibv_dealloc_pd(pd);
+    ret = rdma_destroy_id(cm_server_id);
+    rdma_destroy_event_channel(cm_event_channel);
+    return 0;
+}
+
+int server_remote_memory_ops()
+{
+    struct ibv_wc wc;
+    int ret = -1, i;
+    for (i = 0; i < args.count; i++)
+    {
+        ret = process_work_completion_events(io_completion_channel, &wc, 1);
+        server_send_sge.addr = (uint64_t)server_buffer_mr->addr;
+        server_send_sge.length = (uint32_t)server_buffer_mr->length;
+        server_send_sge.lkey = server_buffer_mr->lkey;
+
+        bzero(&server_send_wr, sizeof(server_send_wr));
+        server_send_wr.sg_list = &server_send_sge;
+        server_send_wr.num_sge = 1;
+        server_send_wr.opcode = IBV_WR_RDMA_WRITE_WITH_IMM;
+        server_send_wr.imm_data = args.size;
+        server_send_wr.send_flags = IBV_SEND_SIGNALED;
+
+        server_send_wr.wr.rdma.rkey = client_metadata_attr.stag.remote_stag;
+        server_send_wr.wr.rdma.remote_addr = client_metadata_attr.address;
+
+        ret = ibv_post_send(client_qp,
+                            &server_send_wr,
+                            &bad_server_send_wr);
+        ret = process_work_completion_events(io_completion_channel, &wc, 1);
+    }
+    return 0;
+}
 
 int main(int argc, char *argv[])
 {
-    Arguments args;
+    struct sockaddr_in server_sockaddr;
+    int ret;
+    bzero(&server_sockaddr, sizeof(server_sockaddr));
+    server_sockaddr.sin_family = AF_INET;
+    server_sockaddr.sin_addr.s_addr = htonl(INADDR_ANY);
     parseArguments(&args, argc, argv);
-    Server server(&args);
-    server.init();
-    sleep(1);
-    server.waitforClient();
-    server.communicate();
 
+    src = NULL;
+    src = (char *)calloc(args.size, sizeof(char));
+    memset(&src, 0, args.size);
+    if (!src)
+    {
+        return -ENOMEM;
+    }
+
+    ret = get_addr(args.ip, (struct sockaddr *)&server_sockaddr);
+    if (ret)
+    {
+        return ret;
+    }
+    server_sockaddr.sin_port = htons(args.port);
+    ret = start_rdma_server(&server_sockaddr);
+    if (ret)
+    {
+        return ret;
+    }
+    ret = setup_client_resouces();
+    if (ret)
+    {
+        return ret;
+    }
+    ret = accept_client_connection();
+    if (ret)
+    {
+        return ret;
+    }
+    ret = server_xchange_metadata_with_client();
+    if (ret)
+    {
+        return ret;
+    }
+    ret = server_remote_memory_ops();
+    if (ret)
+    {
+        return ret;
+    }
+    ret = disconnect_and_cleanup();
+    if (ret)
+    {
+        return ret;
+    }
+
+    printf("%s", src);
     return 0;
 }

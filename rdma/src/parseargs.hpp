@@ -7,7 +7,7 @@
 
 typedef struct Arguments
 {
-    int size;
+    uint32_t size;
     int port;
     int count;
     char *ip;
