@@ -59,11 +59,11 @@ public:
     void communicate()
     {
         void *buffer;
-        int rv;
+        int ret;
         buffer = malloc(_args->size);
         for (int count = 0; count < _args->count; ++count)
         {
-            recv(_clientSockfd, buffer, _args->size, MSG_WAITALL);
+            ret = recv(_clientSockfd, buffer, _args->size, MSG_WAITALL);
             send(_clientSockfd, buffer, _args->size, 0);
         }
         free(buffer);
@@ -77,7 +77,6 @@ private:
 int main(int argc, char *argv[])
 {
     Arguments args;
-
     parseArguments(&args, argc, argv);
 
     Server server(&args);

@@ -288,12 +288,12 @@ int client_remote_memory_ops()
                       &client_send_comp_wr,
                       &bad_client_send_comp_wr);
         process_work_completion_events(io_completion_channel, &wc, 1);
-        /*
-                ibv_post_recv(client_qp,
-                              &server_recv_comp_wr,
-                              &bad_server_recv_comp_wr);
-                process_work_completion_events(io_completion_channel, &wc, 1);
-                */
+
+        ibv_post_recv(client_qp,
+                      &server_recv_comp_wr,
+                      &bad_server_recv_comp_wr);
+        process_work_completion_events(io_completion_channel, &wc, 1);
+
         bench.benchmark();
     }
     bench.evaluate(&args);

@@ -50,6 +50,7 @@ public:
     void communicate()
     {
         void *buffer;
+        int ret;
         buffer = malloc(_args->size);
         memset(buffer, '0', _args->size);
         Benchmark bench(_args);
@@ -57,7 +58,9 @@ public:
         {
             bench.singleStart();
             send(_sockfd, buffer, _args->size, 0);
-            recv(_sockfd, buffer, _args->size, MSG_WAITALL);
+
+            ret = recv(_sockfd, buffer, _args->size, MSG_WAITALL);
+
             bench.benchmark();
         }
         bench.evaluate(_args);
