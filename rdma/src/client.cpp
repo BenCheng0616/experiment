@@ -274,19 +274,22 @@ int client_remote_memory_ops()
         ibv_post_send(client_qp,
                       &client_send_wr,
                       &bad_client_send_wr);
-
         process_work_completion_events(io_completion_channel, &wc, 1);
+        if (wc.status == IBV_WC_SUCCESS)
+        {
+            printf("rdma write success>\n");
+        }
 
         ibv_post_send(client_qp,
                       &client_send_comp_wr,
                       &bad_client_send_comp_wr);
         process_work_completion_events(io_completion_channel, &wc, 1);
-
-        process_work_completion_events(io_completion_channel, &wc, 1);
-        ibv_post_recv(client_qp,
-                      &server_recv_comp_wr,
-                      &bad_server_recv_comp_wr);
-
+        /*
+                process_work_completion_events(io_completion_channel, &wc, 1);
+                ibv_post_recv(client_qp,
+                              &server_recv_comp_wr,
+                              &bad_server_recv_comp_wr);
+        */
         bench.benchmark();
     }
     bench.evaluate(&args);

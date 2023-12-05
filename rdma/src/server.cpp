@@ -315,20 +315,24 @@ int server_remote_memory_ops()
 
     for (i = 0; i < args.count; i++)
     {
-        process_work_completion_events(io_completion_channel, &wc, 1);
+        printf("test1\n");
         ibv_post_recv(client_qp,
                       &client_recv_comp_wr,
                       &bad_client_recv_comp_wr);
+        process_work_completion_events(io_completion_channel, &wc, 1);
 
+        /*
+        printf("test2\n");
         ibv_post_send(client_qp,
                       &server_send_wr,
                       &bad_server_send_wr);
         process_work_completion_events(io_completion_channel, &wc, 1);
-
+        printf("test3\n");
         ibv_post_send(client_qp,
                       &server_send_comp_wr,
                       &bad_server_send_comp_wr);
         process_work_completion_events(io_completion_channel, &wc, 1);
+        */
     }
     return 0;
 }
