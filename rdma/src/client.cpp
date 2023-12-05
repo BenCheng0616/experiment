@@ -254,7 +254,8 @@ int client_remote_memory_ops()
     bzero(&client_send_wr, sizeof(client_send_wr));
     client_send_wr.sg_list = &client_send_sge;
     client_send_wr.num_sge = 1;
-    client_send_wr.opcode = IBV_WR_RDMA_WRITE;
+    client_send_wr.opcode = IBV_WR_RDMA_WRITE_WITH_IMM;
+    client_send_comp_wr.imm_data = args.size;
     client_send_wr.send_flags = IBV_SEND_SIGNALED;
     client_send_wr.wr.rdma.rkey = server_metadata_attr.stag.remote_stag;
     client_send_wr.wr.rdma.remote_addr = server_metadata_attr.address;
@@ -279,11 +280,12 @@ int client_remote_memory_ops()
         {
             printf("rdma write success>\n");
         }
-
-        ibv_post_send(client_qp,
-                      &client_send_comp_wr,
-                      &bad_client_send_comp_wr);
-        process_work_completion_events(io_completion_channel, &wc, 1);
+        /*
+                ibv_post_send(client_qp,
+                              &client_send_comp_wr,
+                              &bad_client_send_comp_wr);
+                process_work_completion_events(io_completion_channel, &wc, 1);
+                */
         /*
                 process_work_completion_events(io_completion_channel, &wc, 1);
                 ibv_post_recv(client_qp,
