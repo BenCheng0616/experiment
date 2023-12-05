@@ -33,7 +33,6 @@ public:
         _bench.sum = 0;
         _bench.squared_sum = 0;
         _bench.total_start = this->now();
-        _timeList.resize(args->count);
     }
 
     ~Benchmark()

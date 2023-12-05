@@ -159,8 +159,9 @@ int client_connect_to_server()
     bzero(&server_recv_comp_wr, sizeof(server_recv_comp_wr));
     server_recv_comp_wr.sg_list = NULL;
     server_recv_comp_wr.num_sge = 0;
-
-    ret = ibv_post_recv(client_qp, &server_recv_comp_wr, &bad_server_recv_comp_wr);
+    ret = ibv_post_recv(client_qp,
+                        &server_recv_comp_wr,
+                        &bad_server_recv_comp_wr);
 
     bzero(&conn_param, sizeof(conn_param));
     conn_param.initiator_depth = 3;
@@ -265,17 +266,9 @@ int client_remote_memory_ops()
     client_send_comp_wr.imm_data = args.size;
     client_send_comp_wr.send_flags = IBV_SEND_SIGNALED;
 
-    bzero(&server_recv_comp_wr, sizeof(server_recv_comp_wr));
-    server_recv_comp_wr.sg_list = NULL;
-    server_recv_comp_wr.num_sge = 0;
-    ret = ibv_post_recv(client_qp,
-                        &server_recv_comp_wr,
-                        &bad_server_recv_comp_wr);
-
     Benchmark bench(&args);
     for (i = 0; i < args.count; i++)
     {
-
         bench.singleStart();
 
         ibv_post_send(client_qp,
@@ -289,10 +282,10 @@ int client_remote_memory_ops()
                       &bad_client_send_comp_wr);
         process_work_completion_events(io_completion_channel, &wc, 1);
 
+        process_work_completion_events(io_completion_channel, &wc, 1);
         ibv_post_recv(client_qp,
                       &server_recv_comp_wr,
                       &bad_server_recv_comp_wr);
-        process_work_completion_events(io_completion_channel, &wc, 1);
 
         bench.benchmark();
     }
