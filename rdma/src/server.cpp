@@ -20,6 +20,7 @@ struct ibv_recv_wr client_recv_comp_wr, *bad_client_recv_comp_wr = NULL;
 struct ibv_sge client_recv_sge, server_send_sge, server_send_comp_sge, client_recv_comp_sge;
 Arguments args;
 void *src = NULL;
+int comp_data = 0;
 
 int setup_client_resouces()
 {
@@ -147,6 +148,11 @@ int server_xchange_metadata_with_client()
     {
         return -ENOMEM;
     }
+
+    comp_mr = rdma_buffer_register(pd,
+                                   &comp_data,
+                                   sizeof(comp_data),
+                                   (IBV_ACCESS_LOCAL_WRITE));
 
     server_metadata_attr.address = (uint64_t)server_buffer_mr->addr;
     server_metadata_attr.length = (uint32_t)server_buffer_mr->length;
@@ -287,7 +293,7 @@ int disconnect_and_cleanup()
 
 int server_remote_memory_ops()
 {
-    struct ibv_wc wc;
+    struct ibv_wc wc[2];
     int ret = -1, i;
 
     // config rdma write wr
@@ -327,20 +333,20 @@ int server_remote_memory_ops()
 
     for (i = 0; i < args.count; i++)
     {
-        process_work_completion_events(io_completion_channel, &wc, 1);
+        process_work_completion_events(io_completion_channel, &wc[0], 1);
         ibv_post_recv(client_qp,
                       &client_recv_comp_wr,
                       &bad_client_recv_comp_wr);
-        printf("recveived %ld Bytes data", strlen((char *)src));
+        // printf("recveived %ld Bytes data", strlen((char *)src));
         ibv_post_send(client_qp,
                       &server_send_wr,
                       &bad_server_send_wr);
-        process_work_completion_events(io_completion_channel, &wc, 1);
+        // process_work_completion_events(io_completion_channel, &wc, 1);
 
         ibv_post_send(client_qp,
                       &server_send_comp_wr,
                       &bad_server_send_comp_wr);
-        process_work_completion_events(io_completion_channel, &wc, 1);
+        process_work_completion_events(io_completion_channel, wc, 2);
     }
     return 0;
 }

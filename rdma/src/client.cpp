@@ -252,7 +252,7 @@ int client_xchange_metadata_with_server()
 
 int client_remote_memory_ops()
 {
-    struct ibv_wc wc;
+    struct ibv_wc wc[3];
     int ret = -1, i;
 
     // config rdma write wr
@@ -298,12 +298,12 @@ int client_remote_memory_ops()
         int ret = ibv_post_send(client_qp,
                                 &client_send_wr,
                                 &bad_client_send_wr);
-        process_work_completion_events(io_completion_channel, &wc, 1);
+        // process_work_completion_events(io_completion_channel, &wc, 1);
         ibv_post_send(client_qp,
                       &client_send_comp_wr,
                       &bad_client_send_comp_wr);
-        process_work_completion_events(io_completion_channel, &wc, 1);
-        process_work_completion_events(io_completion_channel, &wc, 1);
+        // process_work_completion_events(io_completion_channel, &wc, 1);
+        process_work_completion_events(io_completion_channel, wc, 3);
         ibv_post_recv(client_qp,
                       &server_recv_comp_wr,
                       &bad_server_recv_comp_wr);
