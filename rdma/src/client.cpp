@@ -293,7 +293,7 @@ int client_remote_memory_ops()
     client_send_comp_wr.send_flags = IBV_SEND_SIGNALED;
 
     Benchmark bench(&args);
-    for (i = 0; i < args.count; i++)
+    for (i = 0; i < args.count; ++i)
     {
         bench.singleStart();
 

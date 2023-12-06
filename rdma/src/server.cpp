@@ -331,7 +331,7 @@ int server_remote_memory_ops()
     server_send_comp_wr.opcode = IBV_WR_SEND;
     server_send_comp_wr.send_flags = IBV_SEND_SIGNALED;
 
-    for (i = 0; i < args.count; i++)
+    for (i = 0; i < args.count; ++i)
     {
         /*
         process_work_completion_events(io_completion_channel, &wc[0], 1);
@@ -356,6 +356,7 @@ int server_remote_memory_ops()
         process_work_completion_events(io_completion_channel, wc, 2);
         */
     }
+    printf("done\n");
     return 0;
 }
 
