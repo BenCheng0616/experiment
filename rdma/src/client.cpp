@@ -301,11 +301,11 @@ int client_remote_memory_ops()
                                 &client_send_wr,
                                 &bad_client_send_wr);
         process_work_completion_events(io_completion_channel, &wc, 1);
-        memset(src, 0, args.size);
-        while ((len = strlen((char *)src)) < args.size) // wait for data all write in memory;
-        {
-            continue; // do nothin but loop;
-        }
+        // memset(src, 0, args.size);
+        // while ((len = strlen((char *)src)) < args.size) // wait for data all write in memory;
+        //{
+        //  do nothin but loop;
+        //}
         /*
         ibv_post_send(client_qp,
                       &client_send_comp_wr,
