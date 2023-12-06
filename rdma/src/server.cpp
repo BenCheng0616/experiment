@@ -21,6 +21,7 @@ struct ibv_sge client_recv_sge, server_send_sge, server_send_comp_sge, client_re
 Arguments args;
 void *src = NULL;
 char comp_data = '1';
+int len;
 
 int setup_client_resouces()
 {
@@ -305,7 +306,6 @@ int server_remote_memory_ops()
 {
     struct ibv_wc wc;
     int ret = -1, i;
-    int len;
 
     // config rdma write wr
     server_send_sge.addr = (uint64_t)server_buffer_mr->addr;
@@ -333,33 +333,29 @@ int server_remote_memory_ops()
 
     for (i = 0; i < args.count; ++i)
     {
-        /*
+
         process_work_completion_events(io_completion_channel, &wc, 1);
         ibv_post_recv(client_qp,
                       &client_recv_comp_wr,
                       &bad_client_recv_comp_wr);
-        */
-        //
-        // while ((len = strlen((char *)src)) < args.size)
-        //{
-        //}
-        // printf("data received\n");
 
+        //
+        //
+        // printf("data received\n");
+        /*
         ibv_post_send(client_qp,
                       &server_send_wr,
                       &bad_server_send_wr);
         process_work_completion_events(io_completion_channel, &wc, 1);
+        */
         // memset(src, 0, args.size);
-        /*
+
         ibv_post_send(client_qp,
                       &server_send_comp_wr,
                       &bad_server_send_comp_wr);
         process_work_completion_events(io_completion_channel, &wc, 1);
-        */
     }
-    printf("done\n");
-    usleep(0.1);
-    printf("recveived %ld Bytes data", strlen((char *)src));
+
     return 0;
 }
 
@@ -413,6 +409,11 @@ int main(int argc, char *argv[])
         return ret;
     }
 
+    printf("done\n");
+    while ((len = strlen((char *)src)) < args.size)
+    {
+    }
+    printf("recveived %ld Bytes data", strlen((char *)src));
     ret = disconnect_and_cleanup();
     if (ret)
     {

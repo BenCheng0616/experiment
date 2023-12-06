@@ -306,7 +306,7 @@ int client_remote_memory_ops()
         //{
         //  do nothin but loop;
         //}
-        /*
+
         ibv_post_send(client_qp,
                       &client_send_comp_wr,
                       &bad_client_send_comp_wr);
@@ -315,7 +315,6 @@ int client_remote_memory_ops()
         ibv_post_recv(client_qp,
                       &server_recv_comp_wr,
                       &bad_server_recv_comp_wr);
-        */
 
         bench.benchmark();
     }
