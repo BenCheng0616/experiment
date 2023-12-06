@@ -308,7 +308,7 @@ int client_remote_memory_ops()
                       &server_recv_comp_wr,
                       &bad_server_recv_comp_wr);
         bench.benchmark();
-        usleep(50);
+        usleep(100);
     }
     bench.evaluate(&args);
     return 0;
