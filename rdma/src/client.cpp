@@ -264,7 +264,7 @@ int client_xchange_metadata_with_server()
 
 int client_remote_memory_ops()
 {
-    struct ibv_wc wc[2];
+    struct ibv_wc wc;
     int ret = -1, i;
     int len;
 
@@ -311,12 +311,13 @@ int client_remote_memory_ops()
         ibv_post_send(client_qp,
                       &client_send_comp_wr,
                       &bad_client_send_comp_wr);
-        // process_work_completion_events(io_completion_channel, &wc, 1);
-        process_work_completion_events(io_completion_channel, wc, 2);
+        process_work_completion_events(io_completion_channel, &wc, 1);
+        // process_work_completion_events(io_completion_channel, wc, 2);
+        /*
         ibv_post_recv(client_qp,
                       &server_recv_comp_wr,
                       &bad_server_recv_comp_wr);
-
+        */
         bench.benchmark();
     }
     bench.evaluate(&args);
