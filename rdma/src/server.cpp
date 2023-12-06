@@ -330,22 +330,30 @@ int server_remote_memory_ops()
     server_send_comp_wr.opcode = IBV_WR_SEND;
     server_send_comp_wr.send_flags = IBV_SEND_SIGNALED;
 
-        for (i = 0; i < args.count; i++)
+    for (i = 0; i < args.count; i++)
     {
+        /*
         process_work_completion_events(io_completion_channel, &wc[0], 1);
         ibv_post_recv(client_qp,
                       &client_recv_comp_wr,
                       &bad_client_recv_comp_wr);
+        */
         // printf("recveived %ld Bytes data", strlen((char *)src));
+        while (strlen((char *)src) < args.size)
+        {
+        }
+
         ibv_post_send(client_qp,
                       &server_send_wr,
                       &bad_server_send_wr);
+        memset(src, 0, args.size);
         // process_work_completion_events(io_completion_channel, &wc, 1);
-
+        /*
         ibv_post_send(client_qp,
                       &server_send_comp_wr,
                       &bad_server_send_comp_wr);
         process_work_completion_events(io_completion_channel, wc, 2);
+        */
     }
     return 0;
 }
