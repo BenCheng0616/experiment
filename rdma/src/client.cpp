@@ -197,9 +197,9 @@ int client_xchange_metadata_with_server()
     client_src_mr = rdma_buffer_register(pd,
                                          src,
                                          args.size,
-                                         (enum ibv_access_flags)(IBV_ACCESS_LOCAL_WRITE |
-                                                                 IBV_ACCESS_REMOTE_READ |
-                                                                 IBV_ACCESS_REMOTE_WRITE));
+                                         (ibv_access_flags)(IBV_ACCESS_LOCAL_WRITE |
+                                                            IBV_ACCESS_REMOTE_READ |
+                                                            IBV_ACCESS_REMOTE_WRITE));
     if (!client_src_mr)
     {
         return ret;
@@ -207,7 +207,7 @@ int client_xchange_metadata_with_server()
 
     client_metadata_attr.address = (uint64_t)client_src_mr->addr;
     client_metadata_attr.length = (uint32_t)client_src_mr->length;
-    client_metadata_attr.stag.local_stag = client_src_mr->rkey;
+    client_metadata_attr.stag.local_stag = (uint32_t)client_src_mr->rkey;
 
     client_metadata_mr = rdma_buffer_register(pd,
                                               &client_metadata_attr,
@@ -252,6 +252,7 @@ int client_remote_memory_ops()
     client_send_sge.addr = (uint64_t)client_src_mr->addr;
     client_send_sge.length = (uint32_t)client_src_mr->length;
     client_send_sge.lkey = client_src_mr->lkey;
+
     bzero(&client_send_wr, sizeof(client_send_wr));
     client_send_wr.sg_list = &client_send_sge;
     client_send_wr.num_sge = 1;
@@ -272,9 +273,10 @@ int client_remote_memory_ops()
     {
         bench.singleStart();
 
-        ibv_post_send(client_qp,
-                      &client_send_wr,
-                      &bad_client_send_wr);
+        int ret = ibv_post_send(client_qp,
+                                &client_send_wr,
+                                &bad_client_send_wr);
+        printf("ret = %d\n", ret);
         process_work_completion_events(io_completion_channel, &wc, 1);
         if (wc.status == IBV_WC_SUCCESS)
         {

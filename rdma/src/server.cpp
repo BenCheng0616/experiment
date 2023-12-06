@@ -10,7 +10,8 @@ struct ibv_qp_init_attr qp_init_attr;
 struct ibv_qp *client_qp;
 struct ibv_mr *client_metadata_mr = NULL,
               *server_buffer_mr = NULL,
-              *server_metadata_mr = NULL;
+              *server_metadata_mr = NULL,
+              *server_comp_mr = NULL;
 struct rdma_buffer_attr client_metadata_attr, server_metadata_attr;
 struct ibv_send_wr server_send_wr, *bad_server_send_wr = NULL;
 struct ibv_send_wr server_send_comp_wr, *bad_server_send_comp_wr = NULL;
@@ -138,9 +139,9 @@ int server_xchange_metadata_with_client()
     server_buffer_mr = rdma_buffer_register(pd,
                                             src,
                                             args.size,
-                                            (enum ibv_access_flags)(IBV_ACCESS_LOCAL_WRITE |
-                                                                    IBV_ACCESS_REMOTE_READ |
-                                                                    IBV_ACCESS_REMOTE_WRITE));
+                                            (ibv_access_flags)(IBV_ACCESS_LOCAL_WRITE |
+                                                               IBV_ACCESS_REMOTE_WRITE |
+                                                               IBV_ACCESS_REMOTE_READ));
 
     if (!server_buffer_mr)
     {
@@ -148,8 +149,11 @@ int server_xchange_metadata_with_client()
     }
 
     server_metadata_attr.address = (uint64_t)server_buffer_mr->addr;
-    server_metadata_attr.length = (uint64_t)server_buffer_mr->length;
-    server_metadata_attr.stag.local_stag = server_buffer_mr->rkey;
+    server_metadata_attr.length = (uint32_t)server_buffer_mr->length;
+    server_metadata_attr.stag.local_stag = (uint32_t)server_buffer_mr->rkey;
+    // printf("buffer lkey: %d, buffer rkey: %d\n",
+    //       server_buffer_mr->lkey, server_buffer_mr->rkey);
+
     server_metadata_mr = rdma_buffer_register(pd,
                                               &server_metadata_attr,
                                               sizeof(server_metadata_attr),
@@ -321,11 +325,8 @@ int server_remote_memory_ops()
         ibv_post_recv(client_qp,
                       &client_recv_comp_wr,
                       &bad_client_recv_comp_wr);
-        process_work_completion_events(io_completion_channel, &wc, 1);
-        if (wc.opcode == IBV_WC_RECV_RDMA_WITH_IMM)
-        {
-            printf("recv success.\n");
-        }
+                      */
+        // process_work_completion_events(io_completion_channel, &wc, 1);
 
         /*
         printf("test2\n");
@@ -352,8 +353,9 @@ int main(int argc, char *argv[])
     server_sockaddr.sin_addr.s_addr = htonl(INADDR_ANY);
     parseArguments(&args, argc, argv);
 
-    src = NULL;
+    // src = NULL;
     src = malloc(args.size);
+    memset(src, NULL, args.size);
     if (!src)
     {
         return -ENOMEM;
@@ -391,7 +393,9 @@ int main(int argc, char *argv[])
     {
         return ret;
     }
+    // std::cout << (char *)src << "\n";
     printf("%d\n", strlen((char *)src));
+    // printf("%x\n", src);
     ret = disconnect_and_cleanup();
     if (ret)
     {
