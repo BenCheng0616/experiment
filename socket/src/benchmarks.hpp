@@ -75,7 +75,7 @@ public:
         printf("Message count:      %d\n", args->count);
         printf("Total duration:     %.3f\tms\n", total_time / 1e6);
         printf("Average duration:   %.3f\tus\n", average / 1000.0);
-        printf("Minimum duration:   %.3f\tus\n", _bench.minimum / 1000.0);
+        printf("Minimum duration:   %.3f\tns\n", _bench.minimum / 1.0);
         printf("Maximum duration:   %.3f\tus\n", _bench.maximum / 1000.0);
         printf("Standard deviation: %.3f\tus\n", sigma / 1000.0);
         printf("Packet Rate:        %d\tpkt/s\n", packetRate);

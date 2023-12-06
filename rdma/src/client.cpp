@@ -22,7 +22,7 @@ struct ibv_recv_wr server_recv_comp_wr, *bad_server_recv_comp_wr = NULL;
 struct ibv_sge client_send_sge, server_recv_sge, client_send_comp_sge, server_recv_comp_sge;
 Arguments args;
 void *src = NULL;
-int comp_data = 0;
+char comp_data = '1';
 
 int client_prepare_connection(struct sockaddr_in *s_addr)
 {

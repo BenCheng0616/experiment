@@ -20,7 +20,7 @@ struct ibv_recv_wr client_recv_comp_wr, *bad_client_recv_comp_wr = NULL;
 struct ibv_sge client_recv_sge, server_send_sge, server_send_comp_sge, client_recv_comp_sge;
 Arguments args;
 void *src = NULL;
-int comp_data = 0;
+char comp_data = '1';
 
 int setup_client_resouces()
 {
