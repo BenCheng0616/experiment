@@ -1,6 +1,5 @@
 #include "parseargs.hpp"
 #include "common.hpp"
-#include <time.h>
 
 struct rdma_event_channel *cm_event_channel = NULL;
 struct rdma_cm_id *cm_server_id = NULL, *cm_client_id = NULL;
@@ -12,13 +11,13 @@ struct ibv_qp *client_qp;
 struct ibv_mr *client_metadata_mr = NULL,
               *server_buffer_mr = NULL,
               *server_metadata_mr = NULL,
-              *server_comp_mr = NULL;
+              *comp_mr = NULL;
 struct rdma_buffer_attr client_metadata_attr, server_metadata_attr;
 struct ibv_send_wr server_send_wr, *bad_server_send_wr = NULL;
 struct ibv_send_wr server_send_comp_wr, *bad_server_send_comp_wr = NULL;
 struct ibv_recv_wr client_recv_wr, *bad_client_recv_wr = NULL;
 struct ibv_recv_wr client_recv_comp_wr, *bad_client_recv_comp_wr = NULL;
-struct ibv_sge client_recv_sge, server_send_sge;
+struct ibv_sge client_recv_sge, server_send_sge, server_send_comp_sge, client_recv_comp_sge;
 Arguments args;
 void *src = NULL;
 
@@ -291,6 +290,7 @@ int server_remote_memory_ops()
     struct ibv_wc wc;
     int ret = -1, i;
 
+    // config rdma write wr
     server_send_sge.addr = (uint64_t)server_buffer_mr->addr;
     server_send_sge.length = (uint32_t)server_buffer_mr->length;
     server_send_sge.lkey = server_buffer_mr->lkey;
@@ -304,43 +304,43 @@ int server_remote_memory_ops()
     server_send_wr.wr.rdma.rkey = client_metadata_attr.stag.remote_stag;
     server_send_wr.wr.rdma.remote_addr = client_metadata_attr.address;
 
+    // config send comp signal wr
+    server_send_comp_sge.addr = (uint64_t)comp_mr->addr;
+    server_send_comp_sge.length = (uint32_t)comp_mr->length;
+    server_send_comp_sge.lkey = comp_mr->lkey;
     bzero(&server_send_comp_wr, sizeof(server_send_comp_wr));
-    server_send_comp_wr.sg_list = NULL;
-    server_send_comp_wr.num_sge = 0;
-    server_send_comp_wr.opcode = IBV_WR_RDMA_WRITE_WITH_IMM;
-    server_send_comp_wr.imm_data = args.size;
+    server_send_comp_wr.sg_list = &server_send_comp_sge;
+    server_send_comp_wr.num_sge = 1;
+    server_send_comp_wr.opcode = IBV_WR_SEND;
     server_send_comp_wr.send_flags = IBV_SEND_SIGNALED;
-    /*
-        bzero(&client_recv_comp_wr, sizeof(client_recv_comp_wr));
-        client_recv_comp_wr.sg_list = &server_send_sge;
-        client_recv_comp_wr.num_sge = 1;
-        ibv_post_recv(client_qp,
-                      &client_recv_comp_wr,
-                      &bad_client_recv_comp_wr);
-                      */
+
+    // config recv comp signal wr
+    client_recv_comp_sge.addr = (uint64_t)comp_mr->addr;
+    client_recv_comp_sge.length = (uint32_t)comp_mr->length;
+    client_recv_comp_sge.lkey = comp_mr->lkey;
+    bzero(&client_recv_comp_wr, sizeof(client_recv_comp_wr));
+    client_recv_comp_wr.sg_list = &client_recv_comp_sge;
+    client_recv_comp_wr.num_sge = 1;
+    ibv_post_recv(client_qp,
+                  &client_recv_comp_wr,
+                  &bad_client_recv_comp_wr);
 
     for (i = 0; i < args.count; i++)
     {
-        // printf("test1\n");
-        /*
+        process_work_completion_events(io_completion_channel, &wc, 1);
         ibv_post_recv(client_qp,
                       &client_recv_comp_wr,
                       &bad_client_recv_comp_wr);
-                      */
-        // process_work_completion_events(io_completion_channel, &wc, 1);
-
-        /*
-        printf("test2\n");
+        printf("recveived %ld Bytes data", strlen((char *)src));
         ibv_post_send(client_qp,
                       &server_send_wr,
                       &bad_server_send_wr);
         process_work_completion_events(io_completion_channel, &wc, 1);
-        printf("test3\n");
+
         ibv_post_send(client_qp,
                       &server_send_comp_wr,
                       &bad_server_send_comp_wr);
         process_work_completion_events(io_completion_channel, &wc, 1);
-        */
     }
     return 0;
 }
@@ -355,7 +355,7 @@ int main(int argc, char *argv[])
     parseArguments(&args, argc, argv);
 
     src = malloc(args.size);
-    memset(src, NULL, args.size);
+    memset(src, 0, args.size);
     if (!src)
     {
         return -ENOMEM;
@@ -388,28 +388,13 @@ int main(int argc, char *argv[])
     {
         return ret;
     }
-    struct timespec t1, t2;
 
     ret = server_remote_memory_ops();
     if (ret)
     {
         return ret;
     }
-    // std::cout << (char *)src << "\n";
-    // sleep(5);
-    int len = 0;
-    timespec_get(&t1, TIME_UTC);
-    do
-    {
-        len = strlen((char *)src);
-        // printf("%d\n", strlen((char *)src));
-    } while (len < args.size);
 
-    timespec_get(&t2, TIME_UTC);
-    // printf("t1: %ld, t2: %ld\n", t1.tv_nsec, t2.tv_nsec);
-    unsigned long long res = t2.tv_sec * 1e9 + t2.tv_nsec - (t1.tv_sec * 1e9 + t1.tv_nsec);
-    printf("receive %ld Bytes data through %lld us\n", strlen((char *)src), res / 1000);
-    // printf("%x\n", src);
     ret = disconnect_and_cleanup();
     if (ret)
     {

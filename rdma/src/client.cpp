@@ -12,16 +12,17 @@ struct ibv_qp_init_attr qp_init_attr;
 struct ibv_qp *client_qp;
 struct ibv_mr *client_metadata_mr = NULL,
               *client_src_mr = NULL,
-              *client_dst_mr = NULL,
+              *comp_mr = NULL,
               *server_metadata_mr = NULL;
 struct rdma_buffer_attr client_metadata_attr, server_metadata_attr;
 struct ibv_send_wr client_send_wr, *bad_client_send_wr = NULL;
 struct ibv_send_wr client_send_comp_wr, *bad_client_send_comp_wr = NULL;
 struct ibv_recv_wr server_recv_wr, *bad_server_recv_wr = NULL;
 struct ibv_recv_wr server_recv_comp_wr, *bad_server_recv_comp_wr = NULL;
-struct ibv_sge client_send_sge, server_recv_sge;
+struct ibv_sge client_send_sge, server_recv_sge, client_send_comp_sge, server_recv_comp_sge;
 Arguments args;
 void *src = NULL;
+int comp_data = 0;
 
 int client_prepare_connection(struct sockaddr_in *s_addr)
 {
@@ -134,6 +135,11 @@ int client_pre_post_recv_buffer()
                                               &server_metadata_attr,
                                               sizeof(server_metadata_attr),
                                               (IBV_ACCESS_LOCAL_WRITE));
+
+    comp_mr = rdma_buffer_register(pd,
+                                   &comp_data,
+                                   sizeof(comp_data),
+                                   (IBV_ACCESS_LOCAL_WRITE));
     if (!server_metadata_mr)
     {
         return -ENOMEM;
@@ -249,6 +255,7 @@ int client_remote_memory_ops()
     struct ibv_wc wc;
     int ret = -1, i;
 
+    // config rdma write wr
     client_send_sge.addr = (uint64_t)client_src_mr->addr;
     client_send_sge.length = (uint32_t)client_src_mr->length;
     client_send_sge.lkey = client_src_mr->lkey;
@@ -262,12 +269,26 @@ int client_remote_memory_ops()
     client_send_wr.wr.rdma.rkey = server_metadata_attr.stag.remote_stag;
     client_send_wr.wr.rdma.remote_addr = server_metadata_attr.address;
 
+    // config send comp signal wr
+    client_send_comp_sge.addr = (uint64_t)comp_mr->addr;
+    client_send_comp_sge.length = (uint32_t)comp_mr->length;
+    client_send_comp_sge.lkey = comp_mr->lkey;
     bzero(&client_send_comp_wr, sizeof(client_send_comp_wr));
-    client_send_comp_wr.sg_list = NULL;
-    client_send_comp_wr.num_sge = 0;
-    client_send_comp_wr.opcode = IBV_WR_RDMA_WRITE_WITH_IMM;
-    client_send_comp_wr.imm_data = args.size;
+    client_send_comp_wr.sg_list = &client_send_comp_sge;
+    client_send_comp_wr.num_sge = 1;
+    client_send_comp_wr.opcode = IBV_WR_SEND;
     client_send_comp_wr.send_flags = IBV_SEND_SIGNALED;
+
+    // config recv comp signal wr
+    server_recv_comp_sge.addr = (uint64_t)comp_mr->addr;
+    server_recv_comp_sge.length = (uint32_t)comp_mr->length;
+    server_recv_comp_sge.lkey = comp_mr->lkey;
+    bzero(&server_recv_comp_wr, sizeof(server_recv_comp_wr));
+    server_recv_comp_wr.sg_list = &server_recv_comp_sge;
+    server_recv_comp_wr.num_sge = 1;
+    ibv_post_recv(client_qp,
+                  &server_recv_comp_wr,
+                  &bad_server_recv_comp_wr);
 
     Benchmark bench(&args);
     for (i = 0; i < args.count; i++)
@@ -278,18 +299,14 @@ int client_remote_memory_ops()
                                 &client_send_wr,
                                 &bad_client_send_wr);
         process_work_completion_events(io_completion_channel, &wc, 1);
-        /*
-                ibv_post_send(client_qp,
-                              &client_send_comp_wr,
-                              &bad_client_send_comp_wr);
-                process_work_completion_events(io_completion_channel, &wc, 1);
-                */
-        /*
-                process_work_completion_events(io_completion_channel, &wc, 1);
-                ibv_post_recv(client_qp,
-                              &server_recv_comp_wr,
-                              &bad_server_recv_comp_wr);
-        */
+        ibv_post_send(client_qp,
+                      &client_send_comp_wr,
+                      &bad_client_send_comp_wr);
+        process_work_completion_events(io_completion_channel, &wc, 1);
+        process_work_completion_events(io_completion_channel, &wc, 1);
+        ibv_post_recv(client_qp,
+                      &server_recv_comp_wr,
+                      &bad_server_recv_comp_wr);
         bench.benchmark();
     }
     bench.evaluate(&args);
@@ -318,7 +335,7 @@ int client_disconnect_and_clean()
     rdma_buffer_deregister(server_metadata_mr);
     rdma_buffer_deregister(client_metadata_mr);
     rdma_buffer_deregister(client_src_mr);
-    rdma_buffer_deregister(client_dst_mr);
+    rdma_buffer_deregister(comp_mr);
 
     free(src);
 
