@@ -140,16 +140,6 @@ int client_pre_post_recv_buffer()
                                    &comp_data,
                                    sizeof(comp_data),
                                    (IBV_ACCESS_LOCAL_WRITE));
-    // config recv comp signal wr
-    server_recv_comp_sge.addr = (uint64_t)comp_mr->addr;
-    server_recv_comp_sge.length = (uint32_t)comp_mr->length;
-    server_recv_comp_sge.lkey = comp_mr->lkey;
-    bzero(&server_recv_comp_wr, sizeof(server_recv_comp_wr));
-    server_recv_comp_wr.sg_list = &server_recv_comp_sge;
-    server_recv_comp_wr.num_sge = 1;
-    ibv_post_recv(client_qp,
-                  &server_recv_comp_wr,
-                  &bad_server_recv_comp_wr);
 
     if (!server_metadata_mr)
     {
@@ -258,6 +248,17 @@ int client_xchange_metadata_with_server()
         return ret;
     }
     show_rdma_buffer_attr(&server_metadata_attr);
+
+    // config recv comp signal wr
+    server_recv_comp_sge.addr = (uint64_t)comp_mr->addr;
+    server_recv_comp_sge.length = (uint32_t)comp_mr->length;
+    server_recv_comp_sge.lkey = comp_mr->lkey;
+    bzero(&server_recv_comp_wr, sizeof(server_recv_comp_wr));
+    server_recv_comp_wr.sg_list = &server_recv_comp_sge;
+    server_recv_comp_wr.num_sge = 1;
+    ibv_post_recv(client_qp,
+                  &server_recv_comp_wr,
+                  &bad_server_recv_comp_wr);
     return 0;
 }
 

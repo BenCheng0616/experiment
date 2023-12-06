@@ -153,7 +153,6 @@ int server_xchange_metadata_with_client()
                                    &comp_data,
                                    sizeof(comp_data),
                                    (IBV_ACCESS_LOCAL_WRITE));
-
     // config recv comp signal wr and prepost
     client_recv_comp_sge.addr = (uint64_t)comp_mr->addr;
     client_recv_comp_sge.length = (uint32_t)comp_mr->length;
@@ -331,7 +330,7 @@ int server_remote_memory_ops()
     server_send_comp_wr.opcode = IBV_WR_SEND;
     server_send_comp_wr.send_flags = IBV_SEND_SIGNALED;
 
-    for (i = 0; i < args.count; i++)
+        for (i = 0; i < args.count; i++)
     {
         process_work_completion_events(io_completion_channel, &wc[0], 1);
         ibv_post_recv(client_qp,
