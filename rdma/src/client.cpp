@@ -266,6 +266,7 @@ int client_remote_memory_ops()
 {
     struct ibv_wc wc;
     int ret = -1, i;
+    int len;
 
     // config rdma write wr
     client_send_sge.addr = (uint64_t)client_src_mr->addr;
@@ -301,7 +302,7 @@ int client_remote_memory_ops()
                                 &bad_client_send_wr);
         process_work_completion_events(io_completion_channel, &wc, 1);
         memset(src, 0, args.size);
-        while (strlen((char *)src) < args.size) // wait for data all write in memory;
+        while ((len = strlen((char *)src)) < args.size) // wait for data all write in memory;
         {
             continue; // do nothin but loop;
         }

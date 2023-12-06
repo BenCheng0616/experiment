@@ -303,8 +303,9 @@ int disconnect_and_cleanup()
 
 int server_remote_memory_ops()
 {
-    struct ibv_wc wc[2];
+    struct ibv_wc wc;
     int ret = -1, i;
+    int len;
 
     // config rdma write wr
     server_send_sge.addr = (uint64_t)server_buffer_mr->addr;
@@ -339,15 +340,15 @@ int server_remote_memory_ops()
                       &bad_client_recv_comp_wr);
         */
         // printf("recveived %ld Bytes data", strlen((char *)src));
-        while (strlen((char *)src) < args.size)
+        while ((len = strlen((char *)src)) < args.size)
         {
         }
-
+        printf("data received\n");
         ibv_post_send(client_qp,
                       &server_send_wr,
                       &bad_server_send_wr);
+        process_work_completion_events(io_completion_channel, &wc, 1);
         memset(src, 0, args.size);
-        // process_work_completion_events(io_completion_channel, &wc, 1);
         /*
         ibv_post_send(client_qp,
                       &server_send_comp_wr,
