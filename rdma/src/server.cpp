@@ -139,7 +139,7 @@ int server_xchange_metadata_with_client()
 
     server_buffer_mr = rdma_buffer_register(pd,
                                             src,
-                                            args.size * 2,
+                                            args.size,
                                             (ibv_access_flags)(IBV_ACCESS_LOCAL_WRITE |
                                                                IBV_ACCESS_REMOTE_WRITE |
                                                                IBV_ACCESS_REMOTE_READ));
@@ -309,7 +309,7 @@ int server_remote_memory_ops()
 
     // config rdma write wr
     server_send_sge.addr = (uint64_t)server_buffer_mr->addr;
-    server_send_sge.length = (uint32_t)args.size;
+    server_send_sge.length = (uint32_t)server_buffer_mr->length;
     server_send_sge.lkey = server_buffer_mr->lkey;
 
     bzero(&server_send_wr, sizeof(server_send_wr));
@@ -333,29 +333,32 @@ int server_remote_memory_ops()
 
     for (i = 0; i < args.count; ++i)
     {
-
+        /*
         process_work_completion_events(io_completion_channel, &wc, 1);
         ibv_post_recv(client_qp,
                       &client_recv_comp_wr,
                       &bad_client_recv_comp_wr);
-
+        */
         //
         // while ((len = strlen((char *)src)) < args.size)
         //{
         //}
         // printf("data received\n");
+
         ibv_post_send(client_qp,
                       &server_send_wr,
                       &bad_server_send_wr);
         process_work_completion_events(io_completion_channel, &wc, 1);
         // memset(src, 0, args.size);
-
+        /*
         ibv_post_send(client_qp,
                       &server_send_comp_wr,
                       &bad_server_send_comp_wr);
         process_work_completion_events(io_completion_channel, &wc, 1);
+        */
     }
     printf("done\n");
+    usleep(0.1);
     printf("recveived %ld Bytes data", strlen((char *)src));
     return 0;
 }
