@@ -408,12 +408,13 @@ int main(int argc, char *argv[])
     {
         return ret;
     }
-
+    /*
     printf("done\n");
     while ((len = strlen((char *)src)) < args.size)
     {
     }
     printf("recveived %ld Bytes data", strlen((char *)src));
+    */
     ret = disconnect_and_cleanup();
     if (ret)
     {
