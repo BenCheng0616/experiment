@@ -155,13 +155,14 @@ int client_connect_to_server()
     struct rdma_conn_param conn_param;
     struct rdma_cm_event *cm_event = NULL;
     int ret = -1;
-
+    /*
     bzero(&server_recv_comp_wr, sizeof(server_recv_comp_wr));
     server_recv_comp_wr.sg_list = NULL;
     server_recv_comp_wr.num_sge = 0;
     ret = ibv_post_recv(client_qp,
                         &server_recv_comp_wr,
                         &bad_server_recv_comp_wr);
+                        */
 
     bzero(&conn_param, sizeof(conn_param));
     conn_param.initiator_depth = 3;
@@ -254,8 +255,7 @@ int client_remote_memory_ops()
     bzero(&client_send_wr, sizeof(client_send_wr));
     client_send_wr.sg_list = &client_send_sge;
     client_send_wr.num_sge = 1;
-    client_send_wr.opcode = IBV_WR_RDMA_WRITE_WITH_IMM;
-    client_send_wr.imm_data = args.size;
+    client_send_wr.opcode = IBV_WR_RDMA_WRITE;
     client_send_wr.send_flags = IBV_SEND_SIGNALED;
     client_send_wr.wr.rdma.rkey = server_metadata_attr.stag.remote_stag;
     client_send_wr.wr.rdma.remote_addr = server_metadata_attr.address;
