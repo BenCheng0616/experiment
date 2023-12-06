@@ -1,5 +1,6 @@
 #include "parseargs.hpp"
 #include "common.hpp"
+#include <time.h>
 
 struct rdma_event_channel *cm_event_channel = NULL;
 struct rdma_cm_id *cm_server_id = NULL, *cm_client_id = NULL;
@@ -158,7 +159,7 @@ int server_xchange_metadata_with_client()
                                               &server_metadata_attr,
                                               sizeof(server_metadata_attr),
                                               IBV_ACCESS_LOCAL_WRITE);
-    show_rdma_buffer_attr(&server_metadata_attr);
+    // show_rdma_buffer_attr(&server_metadata_attr);
     if (!server_metadata_mr)
     {
         return -ENOMEM;
@@ -320,7 +321,7 @@ int server_remote_memory_ops()
 
     for (i = 0; i < args.count; i++)
     {
-        printf("test1\n");
+        // printf("test1\n");
         /*
         ibv_post_recv(client_qp,
                       &client_recv_comp_wr,
@@ -353,7 +354,6 @@ int main(int argc, char *argv[])
     server_sockaddr.sin_addr.s_addr = htonl(INADDR_ANY);
     parseArguments(&args, argc, argv);
 
-    // src = NULL;
     src = malloc(args.size);
     memset(src, NULL, args.size);
     if (!src)
@@ -388,13 +388,27 @@ int main(int argc, char *argv[])
     {
         return ret;
     }
+    struct timespec t1, t2;
+
     ret = server_remote_memory_ops();
     if (ret)
     {
         return ret;
     }
     // std::cout << (char *)src << "\n";
-    printf("%d\n", strlen((char *)src));
+    // sleep(5);
+    int len = 0;
+    timespec_get(&t1, TIME_UTC);
+    do
+    {
+        len = strlen((char *)src);
+        // printf("%d\n", strlen((char *)src));
+    } while (len < args.size);
+
+    timespec_get(&t2, TIME_UTC);
+    // printf("t1: %ld, t2: %ld\n", t1.tv_nsec, t2.tv_nsec);
+    unsigned long long res = t2.tv_sec * 1e9 + t2.tv_nsec - (t1.tv_sec * 1e9 + t1.tv_nsec);
+    printf("receive %ld Bytes data through %lld us\n", strlen((char *)src), res / 1000);
     // printf("%x\n", src);
     ret = disconnect_and_cleanup();
     if (ret)
