@@ -154,6 +154,17 @@ int server_xchange_metadata_with_client()
                                    sizeof(comp_data),
                                    (IBV_ACCESS_LOCAL_WRITE));
 
+    // config recv comp signal wr and prepost
+    client_recv_comp_sge.addr = (uint64_t)comp_mr->addr;
+    client_recv_comp_sge.length = (uint32_t)comp_mr->length;
+    client_recv_comp_sge.lkey = comp_mr->lkey;
+    bzero(&client_recv_comp_wr, sizeof(client_recv_comp_wr));
+    client_recv_comp_wr.sg_list = &client_recv_comp_sge;
+    client_recv_comp_wr.num_sge = 1;
+    ibv_post_recv(client_qp,
+                  &client_recv_comp_wr,
+                  &bad_client_recv_comp_wr);
+
     server_metadata_attr.address = (uint64_t)server_buffer_mr->addr;
     server_metadata_attr.length = (uint32_t)server_buffer_mr->length;
     server_metadata_attr.stag.local_stag = (uint32_t)server_buffer_mr->rkey;
@@ -319,17 +330,6 @@ int server_remote_memory_ops()
     server_send_comp_wr.num_sge = 1;
     server_send_comp_wr.opcode = IBV_WR_SEND;
     server_send_comp_wr.send_flags = IBV_SEND_SIGNALED;
-
-    // config recv comp signal wr
-    client_recv_comp_sge.addr = (uint64_t)comp_mr->addr;
-    client_recv_comp_sge.length = (uint32_t)comp_mr->length;
-    client_recv_comp_sge.lkey = comp_mr->lkey;
-    bzero(&client_recv_comp_wr, sizeof(client_recv_comp_wr));
-    client_recv_comp_wr.sg_list = &client_recv_comp_sge;
-    client_recv_comp_wr.num_sge = 1;
-    ibv_post_recv(client_qp,
-                  &client_recv_comp_wr,
-                  &bad_client_recv_comp_wr);
 
     for (i = 0; i < args.count; i++)
     {
