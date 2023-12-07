@@ -312,6 +312,18 @@ int client_remote_memory_ops()
                       &client_send_comp_wr,
                       &bad_client_send_comp_wr);
         process_work_completion_events(io_completion_channel, &wc, 1);
+        switch (wc.status)
+        {
+        case IBV_WC_SUCCESS:
+            printf("send successed.\n");
+            break;
+        case IBV_WC_FATAL_ERR:
+            printf("send error.\n");
+            break;
+        case IBV_WC_RETRY_EXC_ERR:
+            printf("retry timeout.\n");
+            break;
+        }
         process_work_completion_events(io_completion_channel, &wc, 1);
 
         ibv_post_recv(client_qp,
