@@ -357,9 +357,9 @@ int server_remote_memory_ops()
     {
         // printf("QP state: %d\n", client_qp->state);
         //  timespec_get(&t1, TIME_UTC);
-        ret = ibv_post_recv(client_qp,
-                            &client_recv_wr,
-                            &bad_client_recv_wr);
+        // ret = ibv_post_recv(client_qp,
+        //                    &client_recv_wr,
+        //                    &bad_client_recv_wr);
         // printf("rr: %d\n", ret);
 
         // printf("recv success.\n");
@@ -380,9 +380,9 @@ int server_remote_memory_ops()
                       &server_send_comp_wr,
                       &bad_server_send_comp_wr);
         */
-        process_work_completion_events(io_completion_channel, &wc[0], 1);
-        // printf("%c\n", comp_data);
-        //  process_work_completion_events(io_completion_channel, &wc, 1);
+        // process_work_completion_events(io_completion_channel, &wc[0], 1);
+        //  printf("%c\n", comp_data);
+        //   process_work_completion_events(io_completion_channel, &wc, 1);
     }
 
     return 0;
