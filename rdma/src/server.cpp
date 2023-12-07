@@ -21,7 +21,7 @@ struct ibv_recv_wr client_recv_comp_wr, *bad_client_recv_comp_wr = NULL;
 struct ibv_sge client_recv_sge, server_send_sge, server_send_comp_sge, client_recv_comp_sge;
 Arguments args;
 void *src = NULL;
-char comp_data = '1';
+char comp_data = '0';
 int len;
 
 int setup_client_resouces()
@@ -65,7 +65,7 @@ int setup_client_resouces()
     qp_init_attr.cap.max_send_sge = MAX_SGE;
     qp_init_attr.cap.max_send_wr = MAX_WR;
     qp_init_attr.qp_type = IBV_QPT_RC;
-
+    qp_init_attr.sq_sig_all = 1;
     qp_init_attr.recv_cq = cq;
     qp_init_attr.send_cq = cq;
 
@@ -75,6 +75,7 @@ int setup_client_resouces()
         return -errno;
     }
     client_qp = cm_client_id->qp;
+
     return ret;
 }
 
@@ -141,7 +142,7 @@ int accept_client_connection()
     client_metadata_mr = rdma_buffer_register(pd,
                                               &client_metadata_attr,
                                               sizeof(client_metadata_attr),
-                                              (IBV_ACCESS_LOCAL_WRITE));
+                                              IBV_ACCESS_LOCAL_WRITE);
     if (!client_metadata_mr)
     {
         return -ENOMEM;
@@ -166,15 +167,22 @@ int accept_client_connection()
     comp_mr = rdma_buffer_register(pd,
                                    &comp_data,
                                    sizeof(comp_data),
-                                   (IBV_ACCESS_LOCAL_WRITE));
-
+                                   IBV_ACCESS_LOCAL_WRITE);
+    if (!comp_mr)
+    {
+        printf("register mr failed.\n");
+    }
     // config recv comp signal wr and prepost
     client_recv_comp_sge.addr = (uint64_t)comp_mr->addr;
-    client_recv_comp_sge.length = (uint32_t)comp_mr->length;
+    client_recv_comp_sge.length = comp_mr->length;
     client_recv_comp_sge.lkey = comp_mr->lkey;
     bzero(&client_recv_comp_wr, sizeof(client_recv_comp_wr));
     client_recv_comp_wr.sg_list = &client_recv_comp_sge;
     client_recv_comp_wr.num_sge = 1;
+
+    ibv_post_recv(client_qp,
+                  &client_recv_comp_wr,
+                  &bad_client_recv_comp_wr);
 
     memset(&conn_param, 0, sizeof(conn_param));
     conn_param.initiator_depth = 3;
@@ -202,6 +210,7 @@ int accept_client_connection()
     memcpy(&remote_sockaddr,
            rdma_get_peer_addr(cm_client_id), sizeof(struct sockaddr_in));
     printf("A new connection is accepted from %s\n", inet_ntoa(remote_sockaddr.sin_addr));
+
     return ret;
 }
 
@@ -304,7 +313,7 @@ int disconnect_and_cleanup()
 
 int server_remote_memory_ops()
 {
-    struct ibv_wc wc;
+    struct ibv_wc wc[2];
     int ret = -1, i;
     struct timespec t1, t2;
 
@@ -316,7 +325,8 @@ int server_remote_memory_ops()
     bzero(&server_send_wr, sizeof(server_send_wr));
     server_send_wr.sg_list = &server_send_sge;
     server_send_wr.num_sge = 1;
-    server_send_wr.opcode = IBV_WR_RDMA_WRITE;
+    server_send_wr.opcode = IBV_WR_RDMA_WRITE_WITH_IMM;
+    server_send_wr.imm_data = args.size;
     server_send_wr.send_flags = IBV_SEND_SIGNALED;
 
     server_send_wr.wr.rdma.rkey = client_metadata_attr.stag.remote_stag;
@@ -332,19 +342,32 @@ int server_remote_memory_ops()
     server_send_comp_wr.opcode = IBV_WR_SEND;
     server_send_comp_wr.send_flags = IBV_SEND_SIGNALED;
 
-    for (i = 0; i < args.count; i++)
-    {
-        timespec_get(&t1, TIME_UTC);
+    client_recv_sge.addr = (uint64_t)server_buffer_mr->addr;
+    client_recv_sge.length = server_buffer_mr->length;
+    client_recv_sge.lkey = server_buffer_mr->lkey;
+    bzero(&client_recv_wr, sizeof(client_recv_wr));
+    client_recv_wr.sg_list = &client_recv_sge;
+    client_recv_wr.num_sge = 1;
 
-        process_work_completion_events(io_completion_channel, &wc, 1);
-        ibv_post_recv(client_qp,
-                      &client_recv_comp_wr,
-                      &bad_client_recv_comp_wr);
-        timespec_get(&t2, TIME_UTC);
-        printf("time: %.3f\tus\n", (t2.tv_sec * 1e9 - t1.tv_sec * 1e9) + (t2.tv_nsec - t1.tv_nsec) / 1000.0);
+    ret = ibv_post_recv(client_qp,
+                        &client_recv_wr,
+                        &bad_client_recv_wr);
+
+    for (i = 0; i < args.count; ++i)
+    {
+        // printf("QP state: %d\n", client_qp->state);
+        //  timespec_get(&t1, TIME_UTC);
+        ret = ibv_post_recv(client_qp,
+                            &client_recv_wr,
+                            &bad_client_recv_wr);
+        // printf("rr: %d\n", ret);
+
+        // printf("recv success.\n");
+        //  timespec_get(&t2, TIME_UTC);
+        //  printf("time: %.3f\tus\n", (t2.tv_sec * 1e9 - t1.tv_sec * 1e9) + (t2.tv_nsec - t1.tv_nsec) / 1000.0);
         //
         //
-        // printf("data received\n");
+        //   printf("data received\n");
         /*
         ibv_post_send(client_qp,
                       &server_send_wr,
@@ -352,11 +375,14 @@ int server_remote_memory_ops()
         process_work_completion_events(io_completion_channel, &wc, 1);
         */
         // memset(src, 0, args.size);
-
+        /*
         ibv_post_send(client_qp,
                       &server_send_comp_wr,
                       &bad_server_send_comp_wr);
-        process_work_completion_events(io_completion_channel, &wc, 1);
+        */
+        process_work_completion_events(io_completion_channel, &wc[0], 1);
+        // printf("%c\n", comp_data);
+        //  process_work_completion_events(io_completion_channel, &wc, 1);
     }
 
     return 0;
@@ -418,6 +444,7 @@ int main(int argc, char *argv[])
     }
     printf("recveived %ld Bytes data", strlen((char *)src));
     */
+
     ret = disconnect_and_cleanup();
     if (ret)
     {

@@ -15,7 +15,7 @@
 #include <rdma/rdma_verbs.h>
 
 #define CQ_CAPACITY 16
-#define MAX_SGE 2
+#define MAX_SGE 8
 #define MAX_WR 8
 
 struct __attribute((packed)) rdma_buffer_attr
@@ -149,22 +149,26 @@ int process_work_completion_events(struct ibv_comp_channel *comp_channel,
     struct ibv_cq *cq_ptr = NULL;
     void *context = NULL;
     int ret = -1, i, total_wc = 0;
+
     ret = ibv_get_cq_event(comp_channel, &cq_ptr, &context);
     if (ret)
     {
         return -errno;
     }
+
     ret = ibv_req_notify_cq(cq_ptr, 0);
     if (ret)
     {
         return -errno;
     }
+
     total_wc = 0;
     do
     {
         ret = ibv_poll_cq(cq_ptr,
                           max_wc - total_wc,
                           wc + total_wc);
+
         if (ret < 0)
         {
             return ret;
@@ -176,10 +180,13 @@ int process_work_completion_events(struct ibv_comp_channel *comp_channel,
     {
         if (wc[i].status != IBV_WC_SUCCESS)
         {
+
             return -(wc[i].status);
         }
     }
+
     ibv_ack_cq_events(cq_ptr, 1);
+
     return total_wc;
 }
 

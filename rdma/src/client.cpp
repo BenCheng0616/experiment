@@ -276,7 +276,8 @@ int client_remote_memory_ops()
     bzero(&client_send_wr, sizeof(client_send_wr));
     client_send_wr.sg_list = &client_send_sge;
     client_send_wr.num_sge = 1;
-    client_send_wr.opcode = IBV_WR_RDMA_WRITE;
+    client_send_wr.opcode = IBV_WR_RDMA_WRITE_WITH_IMM;
+    client_send_wr.imm_data = args.size;
     client_send_wr.send_flags = IBV_SEND_SIGNALED;
 
     client_send_wr.wr.rdma.rkey = server_metadata_attr.stag.remote_stag;
@@ -292,44 +293,41 @@ int client_remote_memory_ops()
     client_send_comp_wr.opcode = IBV_WR_SEND;
     client_send_comp_wr.send_flags = IBV_SEND_SIGNALED;
 
+    server_recv_sge.addr = (uint64_t)client_src_mr->addr;
+    server_recv_sge.length = (uint32_t)client_src_mr->length;
+    server_recv_sge.lkey = (uint32_t)client_src_mr->lkey;
+
+    bzero(&server_recv_wr, sizeof(server_recv_wr));
+    server_recv_wr.sg_list = &server_recv_sge;
+    server_recv_wr.num_sge = 1;
+    ret = ibv_post_recv(client_qp, &server_recv_wr, &bad_server_recv_wr);
+
     Benchmark bench(&args);
     for (i = 0; i < args.count; ++i)
     {
         bench.singleStart();
-        /*
+
         ibv_post_send(client_qp,
                       &client_send_wr,
                       &bad_client_send_wr);
         process_work_completion_events(io_completion_channel, &wc, 1);
-        */
+
         // memset(src, 0, args.size);
         // while ((len = strlen((char *)src)) < args.size) // wait for data all write in memory;
         //{
         //  do nothin but loop;
         //}
+        /*
+                ibv_post_send(client_qp,
+                              &client_send_comp_wr,
+                              &bad_client_send_comp_wr);
+                process_work_completion_events(io_completion_channel, &wc, 1);
 
-        ibv_post_send(client_qp,
-                      &client_send_comp_wr,
-                      &bad_client_send_comp_wr);
-        process_work_completion_events(io_completion_channel, &wc, 1);
-        switch (wc.status)
-        {
-        case IBV_WC_SUCCESS:
-            printf("send successed.\n");
-            break;
-        case IBV_WC_FATAL_ERR:
-            printf("send error.\n");
-            break;
-        case IBV_WC_RETRY_EXC_ERR:
-            printf("retry timeout.\n");
-            break;
-        }
-        printf("WC status: %d\n", wc.status);
-        process_work_completion_events(io_completion_channel, &wc, 1);
-
-        ibv_post_recv(client_qp,
-                      &server_recv_comp_wr,
-                      &bad_server_recv_comp_wr);
+                ibv_post_recv(client_qp,
+                              &server_recv_comp_wr,
+                              &bad_server_recv_comp_wr);
+                process_work_completion_events(io_completion_channel, &wc, 1);
+                */
 
         bench.benchmark();
     }
