@@ -346,8 +346,8 @@ int server_remote_memory_ops()
     client_recv_sge.length = server_buffer_mr->length;
     client_recv_sge.lkey = server_buffer_mr->lkey;
     bzero(&client_recv_wr, sizeof(client_recv_wr));
-    client_recv_wr.sg_list = &client_recv_sge;
-    client_recv_wr.num_sge = 1;
+    client_recv_wr.sg_list = NULL;
+    client_recv_wr.num_sge = 0;
 
     ret = ibv_post_recv(client_qp,
                         &client_recv_wr,
