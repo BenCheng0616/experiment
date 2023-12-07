@@ -15,7 +15,7 @@
 #include <rdma/rdma_verbs.h>
 
 #define CQ_CAPACITY 16
-#define MAX_SGE 8
+#define MAX_SGE 2
 #define MAX_WR 8
 
 struct __attribute((packed)) rdma_buffer_attr

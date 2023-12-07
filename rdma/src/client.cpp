@@ -87,12 +87,14 @@ int client_prepare_connection(struct sockaddr_in *s_addr)
     pd = ibv_alloc_pd(cm_client_id->verbs);
     if (!pd)
     {
+        printf("error 1\n");
         return -errno;
     }
 
     io_completion_channel = ibv_create_comp_channel(cm_client_id->verbs);
     if (!io_completion_channel)
     {
+        printf("error 2\n");
         return -errno;
     }
 
@@ -100,12 +102,14 @@ int client_prepare_connection(struct sockaddr_in *s_addr)
                               CQ_CAPACITY, NULL, io_completion_channel, 0);
     if (!client_cq)
     {
+        printf("error 3\n");
         return -errno;
     }
 
     ret = ibv_req_notify_cq(client_cq, 0);
     if (ret)
     {
+        printf("error 4\n");
         return -errno;
     }
 
@@ -122,6 +126,7 @@ int client_prepare_connection(struct sockaddr_in *s_addr)
     ret = rdma_create_qp(cm_client_id, pd, &qp_init_attr);
     if (ret)
     {
+        printf("error 5\n");
         return -errno;
     }
     client_qp = cm_client_id->qp;

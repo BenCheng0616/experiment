@@ -65,7 +65,7 @@ int setup_client_resouces()
     qp_init_attr.cap.max_send_sge = MAX_SGE;
     qp_init_attr.cap.max_send_wr = MAX_WR;
     qp_init_attr.qp_type = IBV_QPT_RC;
-    qp_init_attr.sq_sig_all = 1;
+    // qp_init_attr.sq_sig_all = 1;
     qp_init_attr.recv_cq = cq;
     qp_init_attr.send_cq = cq;
 
@@ -117,6 +117,7 @@ int start_rdma_server(struct sockaddr_in *server_addr)
     {
         return ret;
     }
+    printf("client connect request.\n");
 
     cm_client_id = cm_event->id;
 
