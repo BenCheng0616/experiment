@@ -324,6 +324,7 @@ int client_remote_memory_ops()
             printf("retry timeout.\n");
             break;
         }
+        printf("WC status: %d\n", wc.status);
         process_work_completion_events(io_completion_channel, &wc, 1);
 
         ibv_post_recv(client_qp,
