@@ -12,17 +12,15 @@ struct ibv_qp_init_attr qp_init_attr;
 struct ibv_qp *client_qp;
 struct ibv_mr *client_metadata_mr = NULL,
               *client_src_mr = NULL,
-              *comp_mr = NULL,
               *server_metadata_mr = NULL;
 struct rdma_buffer_attr client_metadata_attr, server_metadata_attr;
 struct ibv_send_wr client_send_wr, *bad_client_send_wr = NULL;
 struct ibv_send_wr client_send_comp_wr, *bad_client_send_comp_wr = NULL;
 struct ibv_recv_wr server_recv_wr, *bad_server_recv_wr = NULL;
 struct ibv_recv_wr server_recv_comp_wr, *bad_server_recv_comp_wr = NULL;
-struct ibv_sge client_send_sge, server_recv_sge, client_send_comp_sge, server_recv_comp_sge;
+struct ibv_sge client_send_sge, server_recv_sge;
 Arguments args;
 void *src = NULL;
-char comp_data = '1';
 
 int client_prepare_connection(struct sockaddr_in *s_addr)
 {
@@ -87,14 +85,12 @@ int client_prepare_connection(struct sockaddr_in *s_addr)
     pd = ibv_alloc_pd(cm_client_id->verbs);
     if (!pd)
     {
-        printf("error 1\n");
         return -errno;
     }
 
     io_completion_channel = ibv_create_comp_channel(cm_client_id->verbs);
     if (!io_completion_channel)
     {
-        printf("error 2\n");
         return -errno;
     }
 
@@ -102,14 +98,12 @@ int client_prepare_connection(struct sockaddr_in *s_addr)
                               CQ_CAPACITY, NULL, io_completion_channel, 0);
     if (!client_cq)
     {
-        printf("error 3\n");
         return -errno;
     }
 
     ret = ibv_req_notify_cq(client_cq, 0);
     if (ret)
     {
-        printf("error 4\n");
         return -errno;
     }
 
@@ -126,7 +120,6 @@ int client_prepare_connection(struct sockaddr_in *s_addr)
     ret = rdma_create_qp(cm_client_id, pd, &qp_init_attr);
     if (ret)
     {
-        printf("error 5\n");
         return -errno;
     }
     client_qp = cm_client_id->qp;
@@ -140,11 +133,6 @@ int client_pre_post_recv_buffer()
                                               &server_metadata_attr,
                                               sizeof(server_metadata_attr),
                                               (IBV_ACCESS_LOCAL_WRITE));
-
-    comp_mr = rdma_buffer_register(pd,
-                                   &comp_data,
-                                   sizeof(comp_data),
-                                   (IBV_ACCESS_LOCAL_WRITE));
 
     if (!server_metadata_mr)
     {
@@ -167,14 +155,6 @@ int client_connect_to_server()
     struct rdma_conn_param conn_param;
     struct rdma_cm_event *cm_event = NULL;
     int ret = -1;
-    /*
-    bzero(&server_recv_comp_wr, sizeof(server_recv_comp_wr));
-    server_recv_comp_wr.sg_list = NULL;
-    server_recv_comp_wr.num_sge = 0;
-    ret = ibv_post_recv(client_qp,
-                        &server_recv_comp_wr,
-                        &bad_server_recv_comp_wr);
-                        */
 
     bzero(&conn_param, sizeof(conn_param));
     conn_param.initiator_depth = 3;
@@ -190,6 +170,7 @@ int client_connect_to_server()
     ret = process_rdma_cm_event(cm_event_channel, RDMA_CM_EVENT_ESTABLISHED, &cm_event);
     if (ret)
     {
+        printf("%d\n", ret);
         return ret;
     }
 
@@ -254,89 +235,6 @@ int client_xchange_metadata_with_server()
     }
     show_rdma_buffer_attr(&server_metadata_attr);
 
-    // config recv comp signal wr
-    server_recv_comp_sge.addr = (uint64_t)comp_mr->addr;
-    server_recv_comp_sge.length = (uint32_t)comp_mr->length;
-    server_recv_comp_sge.lkey = comp_mr->lkey;
-    bzero(&server_recv_comp_wr, sizeof(server_recv_comp_wr));
-    server_recv_comp_wr.sg_list = &server_recv_comp_sge;
-    server_recv_comp_wr.num_sge = 1;
-    ibv_post_recv(client_qp,
-                  &server_recv_comp_wr,
-                  &bad_server_recv_comp_wr);
-    return 0;
-}
-
-int client_remote_memory_ops()
-{
-    struct ibv_wc wc;
-    int ret = -1, i;
-    int len;
-
-    // config rdma write wr
-    client_send_sge.addr = (uint64_t)client_src_mr->addr;
-    client_send_sge.length = (uint32_t)client_src_mr->length;
-    client_send_sge.lkey = client_src_mr->lkey;
-
-    bzero(&client_send_wr, sizeof(client_send_wr));
-    client_send_wr.sg_list = &client_send_sge;
-    client_send_wr.num_sge = 1;
-    client_send_wr.opcode = IBV_WR_RDMA_WRITE;
-    // client_send_wr.imm_data = args.size;
-    client_send_wr.send_flags = IBV_SEND_SIGNALED;
-
-    client_send_wr.wr.rdma.rkey = server_metadata_attr.stag.remote_stag;
-    client_send_wr.wr.rdma.remote_addr = server_metadata_attr.address;
-
-    // config send comp signal wr
-    client_send_comp_sge.addr = (uint64_t)comp_mr->addr;
-    client_send_comp_sge.length = (uint32_t)comp_mr->length;
-    client_send_comp_sge.lkey = comp_mr->lkey;
-    bzero(&client_send_comp_wr, sizeof(client_send_comp_wr));
-    client_send_comp_wr.sg_list = &client_send_comp_sge;
-    client_send_comp_wr.num_sge = 1;
-    client_send_comp_wr.opcode = IBV_WR_SEND;
-    client_send_comp_wr.send_flags = IBV_SEND_SIGNALED;
-
-    server_recv_sge.addr = (uint64_t)client_src_mr->addr;
-    server_recv_sge.length = (uint32_t)client_src_mr->length;
-    server_recv_sge.lkey = (uint32_t)client_src_mr->lkey;
-
-    bzero(&server_recv_wr, sizeof(server_recv_wr));
-    server_recv_wr.sg_list = &server_recv_sge;
-    server_recv_wr.num_sge = 1;
-    ret = ibv_post_recv(client_qp, &server_recv_wr, &bad_server_recv_wr);
-
-    Benchmark bench(&args);
-    for (i = 0; i < args.count; ++i)
-    {
-        bench.singleStart();
-
-        ibv_post_send(client_qp,
-                      &client_send_wr,
-                      &bad_client_send_wr);
-        process_work_completion_events(io_completion_channel, &wc, 1);
-
-        // memset(src, 0, args.size);
-        // while ((len = strlen((char *)src)) < args.size) // wait for data all write in memory;
-        //{
-        //  do nothin but loop;
-        //}
-        /*
-                ibv_post_send(client_qp,
-                              &client_send_comp_wr,
-                              &bad_client_send_comp_wr);
-                process_work_completion_events(io_completion_channel, &wc, 1);
-
-                ibv_post_recv(client_qp,
-                              &server_recv_comp_wr,
-                              &bad_server_recv_comp_wr);
-                process_work_completion_events(io_completion_channel, &wc, 1);
-                */
-
-        bench.benchmark();
-    }
-    bench.evaluate(&args);
     return 0;
 }
 
@@ -362,12 +260,61 @@ int client_disconnect_and_clean()
     rdma_buffer_deregister(server_metadata_mr);
     rdma_buffer_deregister(client_metadata_mr);
     rdma_buffer_deregister(client_src_mr);
-    rdma_buffer_deregister(comp_mr);
 
     free(src);
 
     ret = ibv_dealloc_pd(pd);
     rdma_destroy_event_channel(cm_event_channel);
+    return 0;
+}
+
+int client_remote_memory_ops()
+{
+    struct ibv_wc wc[2];
+    int ret = -1, i;
+
+    // config rdma write wr
+    client_send_sge.addr = (uint64_t)client_src_mr->addr;
+    client_send_sge.length = (uint32_t)client_src_mr->length;
+    client_send_sge.lkey = client_src_mr->lkey;
+
+    bzero(&client_send_wr, sizeof(client_send_wr));
+    client_send_wr.sg_list = &client_send_sge;
+    client_send_wr.num_sge = 1;
+    client_send_wr.opcode = IBV_WR_RDMA_WRITE;
+    client_send_wr.send_flags = 0;
+
+    client_send_wr.wr.rdma.rkey = server_metadata_attr.stag.remote_stag; // remote key
+    client_send_wr.wr.rdma.remote_addr = server_metadata_attr.address;   // remote address
+
+    // config completion wr send to server
+    bzero(&client_send_comp_wr, sizeof(client_send_comp_wr));
+    client_send_comp_wr.sg_list = NULL;
+    client_send_comp_wr.num_sge = 0;
+    client_send_comp_wr.opcode = IBV_WR_SEND;
+    client_send_comp_wr.send_flags = IBV_SEND_SIGNALED;
+
+    // config completion wr recv from server
+    bzero(&server_recv_comp_wr, sizeof(server_recv_comp_wr));
+    server_recv_comp_wr.sg_list = NULL;
+    server_recv_comp_wr.num_sge = 0;
+    ibv_post_recv(client_qp, &server_recv_comp_wr, &bad_server_recv_comp_wr);
+
+    Benchmark bench(&args);
+    for (i = 0; i < args.count; ++i)
+    {
+        bench.singleStart();
+
+        ibv_post_send(client_qp, &client_send_wr, &bad_client_send_wr);
+
+        ibv_post_send(client_qp, &client_send_comp_wr, &bad_client_send_comp_wr);
+
+        process_work_completion_events(io_completion_channel, wc, 2);
+        ibv_post_recv(client_qp, &server_recv_comp_wr, &bad_server_recv_comp_wr);
+
+        bench.benchmark();
+    }
+    bench.evaluate(&args);
     return 0;
 }
 
