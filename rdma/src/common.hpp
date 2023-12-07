@@ -179,7 +179,6 @@ int process_work_completion_events(struct ibv_comp_channel *comp_channel,
             return -(wc[i].status);
         }
     }
-
     ibv_ack_cq_events(cq_ptr, 1);
     return total_wc;
 }
