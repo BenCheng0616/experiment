@@ -10,8 +10,7 @@ struct ibv_qp_init_attr qp_init_attr;
 struct ibv_qp *client_qp;
 struct ibv_mr *client_metadata_mr = NULL,
               *server_buffer_mr = NULL,
-              *server_metadata_mr = NULL,
-              *comp_mr = NULL;
+              *server_metadata_mr = NULL;
 struct rdma_buffer_attr client_metadata_attr, server_metadata_attr;
 struct ibv_send_wr server_send_wr, *bad_server_send_wr = NULL;
 struct ibv_send_wr server_send_comp_wr, *bad_server_send_comp_wr = NULL;
@@ -324,9 +323,9 @@ int server_remote_memory_ops()
     {
         process_work_completion_events(io_completion_channel, &wc, 1); // wait for receive completion signal from client
         ibv_post_recv(client_qp, &client_recv_comp_wr, &bad_client_recv_comp_wr);
-        ibv_post_send(client_qp, &server_send_wr, &bad_server_send_wr);
-        ibv_post_send(client_qp, &server_send_comp_wr, &bad_server_send_comp_wr); // send completion signal to client
-        process_work_completion_events(io_completion_channel, &wc, 1);
+        // ibv_post_send(client_qp, &server_send_wr, &bad_server_send_wr);
+        //  ibv_post_send(client_qp, &server_send_comp_wr, &bad_server_send_comp_wr); // send completion signal to client
+        //  process_work_completion_events(io_completion_channel, &wc, 1);
     }
 
     return 0;
@@ -381,13 +380,6 @@ int main(int argc, char *argv[])
     {
         return ret;
     }
-    /*
-    printf("done\n");
-    while ((len = strlen((char *)src)) < args.size)
-    {
-    }
-    printf("recveived %ld Bytes data", strlen((char *)src));
-    */
 
     ret = disconnect_and_cleanup();
     if (ret)
