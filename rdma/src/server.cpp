@@ -221,14 +221,11 @@ int server_xchange_metadata_with_client()
     server_metadata_attr.address = (uint64_t)server_buffer_mr->addr;
     server_metadata_attr.length = (uint32_t)server_buffer_mr->length;
     server_metadata_attr.stag.local_stag = (uint32_t)server_buffer_mr->rkey;
-    // printf("buffer lkey: %d, buffer rkey: %d\n",
-    //       server_buffer_mr->lkey, server_buffer_mr->rkey);
 
     server_metadata_mr = rdma_buffer_register(pd,
                                               &server_metadata_attr,
                                               sizeof(server_metadata_attr),
                                               IBV_ACCESS_LOCAL_WRITE);
-    // show_rdma_buffer_attr(&server_metadata_attr);
     if (!server_metadata_mr)
     {
         return -ENOMEM;
@@ -255,15 +252,13 @@ int server_xchange_metadata_with_client()
         return ret;
     }
 
-    // config completion wr recv from server
-    client_recv_sge.addr = (uint64_t)signal_mr->addr;
-    client_recv_sge.length = (uint32_t)signal_mr->length;
-    client_recv_sge.lkey = signal_mr->lkey;
-    bzero(&client_recv_comp_wr, sizeof(client_recv_comp_wr));
-    client_recv_comp_wr.sg_list = &client_recv_sge;
-    client_recv_comp_wr.num_sge = 1;
-    ibv_post_recv(client_qp, &client_recv_comp_wr, &bad_client_recv_comp_wr);
+    struct ibv_qp_attr qp_attr;
 
+    qp_attr.qp_state = IBV_QPS_RTS;
+    ibv_modify_qp(client_qp, &qp_attr, IBV_QP_STATE);
+    printf("QP: %d\n", client_qp->state);
+    // qp_attr.qp_state = IBV_QP_
+    //     ibv_modify_qp(client_qp, );
     return 0;
 }
 
@@ -305,8 +300,7 @@ int server_remote_memory_ops()
 {
     struct ibv_wc wc;
     int ret = -1, i;
-    struct timespec t1, t2;
-
+    uint32_t len;
     // config rdma write wr
     server_send_sge.addr = (uint64_t)server_buffer_mr->addr;
     server_send_sge.length = (uint32_t)server_buffer_mr->length;
@@ -316,7 +310,7 @@ int server_remote_memory_ops()
     server_send_wr.sg_list = &server_send_sge;
     server_send_wr.num_sge = 1;
     server_send_wr.opcode = IBV_WR_RDMA_WRITE;
-    server_send_wr.send_flags = 0;
+    server_send_wr.send_flags = IBV_SEND_SIGNALED;
 
     server_send_wr.wr.rdma.rkey = client_metadata_attr.stag.remote_stag; // remote key
     server_send_wr.wr.rdma.remote_addr = client_metadata_attr.address;   // remote address
@@ -328,16 +322,42 @@ int server_remote_memory_ops()
     server_send_comp_wr.opcode = IBV_WR_SEND;
     server_send_comp_wr.send_flags = IBV_SEND_SIGNALED;
 
+    // MUST prepost receive before client send
+    // config completion wr recv from server
+    client_recv_sge.addr = (uint64_t)signal_mr->addr;
+    client_recv_sge.length = (uint32_t)signal_mr->length;
+    client_recv_sge.lkey = signal_mr->lkey;
+    bzero(&client_recv_comp_wr, sizeof(client_recv_comp_wr));
+    client_recv_comp_wr.sg_list = &client_recv_sge;
+    client_recv_comp_wr.num_sge = 1;
+    // ibv_post_recv(client_qp, &client_recv_comp_wr, &bad_client_recv_comp_wr);
+
     for (i = 0; i < args.count; ++i)
     {
-        process_work_completion_events(io_completion_channel, &wc, 1); // wait for receive completion signal from client
-        ret = ibv_post_recv(client_qp, &client_recv_comp_wr, &bad_client_recv_comp_wr);
-        printf("ret = %d\n", ret);
-        // ibv_post_send(client_qp, &server_send_wr, &bad_server_send_wr);
-        //  ibv_post_send(client_qp, &server_send_comp_wr, &bad_server_send_comp_wr); // send completion signal to client
+        // process_work_completion_events(io_completion_channel, &wc, 1); // wait for receive completion signal from client
+        //  printf("test1: %d\n", wc.status);
+        //  printf("recv data: %d bytes\n", strlen((char *)src));
+        //  printf("QP: %d\n", client_qp->state);
+        // ibv_post_recv(client_qp, &client_recv_comp_wr, &bad_client_recv_comp_wr);
+        //  ibv_post_send(client_qp, &server_send_wr, &bad_server_send_wr);
         //  process_work_completion_events(io_completion_channel, &wc, 1);
-    }
+        //  printf("test2: %d\n", wc.status);
+        // ibv_post_send(client_qp, &server_send_comp_wr, &bad_server_send_comp_wr); // send completion signal to client
+        //  printf("QP: %d\n", client_qp->state);
+        // process_work_completion_events(io_completion_channel, &wc, 1);
+        //  printf("test3: %d\n", wc.status);
 
+        // printf("%d\n", i);
+        do
+        {
+            len = strlen((char *)src);
+        } while (len < args.size);
+        printf("RECV %d Bytes of Data.\n", len);
+        ibv_post_send(client_qp, &server_send_wr, &bad_server_send_wr);
+        process_work_completion_events(io_completion_channel, &wc, 1);
+        bzero(src, args.size);
+        //  usleep(50);
+    }
     return 0;
 }
 
