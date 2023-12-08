@@ -283,7 +283,7 @@ int client_disconnect_and_clean()
 
 int client_remote_memory_ops()
 {
-    struct ibv_wc wc;
+    struct ibv_wc wc[2];
     int ret = -1, i;
     int len;
 
@@ -296,7 +296,7 @@ int client_remote_memory_ops()
     client_send_wr.sg_list = &client_send_sge;
     client_send_wr.num_sge = 1;
     client_send_wr.opcode = IBV_WR_RDMA_WRITE;
-    client_send_wr.send_flags = IBV_SEND_SIGNALED;
+    // client_send_wr.send_flags = IBV_SEND_SIGNALED;
 
     client_send_wr.wr.rdma.rkey = server_metadata_attr.stag.remote_stag; // remote key
     client_send_wr.wr.rdma.remote_addr = server_metadata_attr.address;   // remote address
@@ -322,16 +322,16 @@ int client_remote_memory_ops()
     {
         bench.singleStart();
 
-        ret = ibv_post_send(client_qp, &client_send_wr, &bad_client_send_wr);
-        process_work_completion_events(io_completion_channel, &wc, 1);
-        ret = ibv_post_send(client_qp, &client_send_comp_wr, &bad_client_send_comp_wr);
-        process_work_completion_events(io_completion_channel, &wc, 1);
-        // do
+        ibv_post_send(client_qp, &client_send_wr, &bad_client_send_wr);
+        // process_work_completion_events(io_completion_channel, &wc, 1);
+        ibv_post_send(client_qp, &client_send_comp_wr, &bad_client_send_comp_wr);
+        // process_work_completion_events(io_completion_channel, &wc, 1);
+        //  do
         //{
-        //    len = strlen((char *)src);
-        //} while (len < args.size);
-        // printf("RECV %d Bytes of Data.\n", len);
-        process_work_completion_events(io_completion_channel, &wc, 1);
+        //     len = strlen((char *)src);
+        // } while (len < args.size);
+        //  printf("RECV %d Bytes of Data.\n", len);
+        process_work_completion_events(io_completion_channel, wc, 2);
         ibv_post_recv(client_qp, &server_recv_comp_wr, &bad_server_recv_comp_wr);
         bench.benchmark();
     }
