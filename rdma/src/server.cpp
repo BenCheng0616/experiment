@@ -338,8 +338,8 @@ int server_remote_memory_ops()
 
         // ibv_post_send(client_qp, &server_send_wr, &bad_server_send_wr);
 
-        // ibv_post_send(client_qp, &server_send_comp_wr, &bad_server_send_comp_wr); // send completion signal to client
-        // process_work_completion_events(io_completion_channel, &wc, 1);
+        ibv_post_send(client_qp, &server_send_comp_wr, &bad_server_send_comp_wr); // send completion signal to client
+        process_work_completion_events(io_completion_channel, &wc, 1);
     }
     return 0;
 }
