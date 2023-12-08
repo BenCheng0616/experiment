@@ -334,9 +334,9 @@ int client_remote_memory_ops()
         {
             len = strlen((char *)src);
         } while (len < args.size);
-        printf("RECV %d Bytes of Data.\n", len);
-        // ibv_post_recv(client_qp, &server_recv_comp_wr, &bad_server_recv_comp_wr);
-        // process_work_completion_events(io_completion_channel, wc, 3);
+        // printf("RECV %d Bytes of Data.\n", len);
+        //  ibv_post_recv(client_qp, &server_recv_comp_wr, &bad_server_recv_comp_wr);
+        //  process_work_completion_events(io_completion_channel, wc, 3);
         /// printf("test3: %d\n", wc.status);
         // ibv_post_recv(client_qp, &server_recv_comp_wr, &bad_server_recv_comp_wr);
         bench.benchmark();

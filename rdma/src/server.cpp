@@ -352,7 +352,7 @@ int server_remote_memory_ops()
         {
             len = strlen((char *)src);
         } while (len < args.size);
-        printf("RECV %d Bytes of Data.\n", len);
+        // printf("RECV %d Bytes of Data.\n", len);
         ibv_post_send(client_qp, &server_send_wr, &bad_server_send_wr);
         process_work_completion_events(io_completion_channel, &wc, 1);
         bzero(src, args.size);
