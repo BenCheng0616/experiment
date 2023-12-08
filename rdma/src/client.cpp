@@ -315,7 +315,7 @@ int client_remote_memory_ops()
     bzero(&server_recv_comp_wr, sizeof(server_recv_comp_wr));
     server_recv_comp_wr.sg_list = &server_recv_sge;
     server_recv_comp_wr.num_sge = 1;
-    // ibv_post_recv(client_qp, &server_recv_comp_wr, &bad_server_recv_comp_wr);
+    ibv_post_recv(client_qp, &server_recv_comp_wr, &bad_server_recv_comp_wr);
 
     Benchmark bench(&args);
     for (i = 0; i < args.count; ++i)
@@ -324,24 +324,16 @@ int client_remote_memory_ops()
 
         ret = ibv_post_send(client_qp, &client_send_wr, &bad_client_send_wr);
         process_work_completion_events(io_completion_channel, &wc, 1);
-        //  printf("QP state: %d\n", client_qp->state);
-        // printf("test1: %d\n", wc.status);
-        // ret = ibv_post_send(client_qp, &client_send_comp_wr, &bad_client_send_comp_wr);
-        // process_work_completion_events(io_completion_channel, &wc, 1);
-        // printf("test2: %d\n", wc.status);
-        bzero(src, args.size);
-        do
-        {
-            len = strlen((char *)src);
-        } while (len < args.size);
+        ret = ibv_post_send(client_qp, &client_send_comp_wr, &bad_client_send_comp_wr);
+        process_work_completion_events(io_completion_channel, &wc, 1);
+        // do
+        //{
+        //    len = strlen((char *)src);
+        //} while (len < args.size);
         // printf("RECV %d Bytes of Data.\n", len);
-        //  ibv_post_recv(client_qp, &server_recv_comp_wr, &bad_server_recv_comp_wr);
-        //  process_work_completion_events(io_completion_channel, wc, 3);
-        /// printf("test3: %d\n", wc.status);
-        // ibv_post_recv(client_qp, &server_recv_comp_wr, &bad_server_recv_comp_wr);
+        process_work_completion_events(io_completion_channel, &wc, 1);
+        ibv_post_recv(client_qp, &server_recv_comp_wr, &bad_server_recv_comp_wr);
         bench.benchmark();
-        // usleep(10000);
-        //   printf("%d\n", i);
     }
     bench.evaluate(&args);
     return 0;

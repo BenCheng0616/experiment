@@ -257,8 +257,7 @@ int server_xchange_metadata_with_client()
     qp_attr.qp_state = IBV_QPS_RTS;
     ibv_modify_qp(client_qp, &qp_attr, IBV_QP_STATE);
     printf("QP: %d\n", client_qp->state);
-    // qp_attr.qp_state = IBV_QP_
-    //     ibv_modify_qp(client_qp, );
+
     return 0;
 }
 
@@ -330,33 +329,27 @@ int server_remote_memory_ops()
     bzero(&client_recv_comp_wr, sizeof(client_recv_comp_wr));
     client_recv_comp_wr.sg_list = &client_recv_sge;
     client_recv_comp_wr.num_sge = 1;
-    // ibv_post_recv(client_qp, &client_recv_comp_wr, &bad_client_recv_comp_wr);
+    ibv_post_recv(client_qp, &client_recv_comp_wr, &bad_client_recv_comp_wr);
 
     for (i = 0; i < args.count; ++i)
     {
-        // process_work_completion_events(io_completion_channel, &wc, 1); // wait for receive completion signal from client
-        //  printf("test1: %d\n", wc.status);
-        //  printf("recv data: %d bytes\n", strlen((char *)src));
-        //  printf("QP: %d\n", client_qp->state);
-        // ibv_post_recv(client_qp, &client_recv_comp_wr, &bad_client_recv_comp_wr);
-        //  ibv_post_send(client_qp, &server_send_wr, &bad_server_send_wr);
-        //  process_work_completion_events(io_completion_channel, &wc, 1);
-        //  printf("test2: %d\n", wc.status);
-        // ibv_post_send(client_qp, &server_send_comp_wr, &bad_server_send_comp_wr); // send completion signal to client
-        //  printf("QP: %d\n", client_qp->state);
-        // process_work_completion_events(io_completion_channel, &wc, 1);
-        //  printf("test3: %d\n", wc.status);
+        process_work_completion_events(io_completion_channel, &wc, 1); // wait for receive completion signal from client
+        ibv_post_recv(client_qp, &client_recv_comp_wr, &bad_client_recv_comp_wr);
 
-        // printf("%d\n", i);
+        ibv_post_send(client_qp, &server_send_wr, &bad_server_send_wr);
+        process_work_completion_events(io_completion_channel, &wc, 1);
+
+        ibv_post_send(client_qp, &server_send_comp_wr, &bad_server_send_comp_wr); // send completion signal to client
+        process_work_completion_events(io_completion_channel, &wc, 1);
+        /*
         do
         {
             len = strlen((char *)src);
         } while (len < args.size);
-        // printf("RECV %d Bytes of Data.\n", len);
+        */
         ibv_post_send(client_qp, &server_send_wr, &bad_server_send_wr);
         process_work_completion_events(io_completion_channel, &wc, 1);
-        bzero(src, args.size);
-        //  usleep(50);
+        // bzero(src, args.size);
     }
     return 0;
 }
