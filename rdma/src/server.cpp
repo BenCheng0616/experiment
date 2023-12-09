@@ -336,7 +336,7 @@ int server_remote_memory_ops()
         process_work_completion_events(io_completion_channel, &wc, 1); // wait for receive completion signal from client
         ibv_post_recv(client_qp, &client_recv_comp_wr, &bad_client_recv_comp_wr);
 
-        // ibv_post_send(client_qp, &server_send_wr, &bad_server_send_wr);
+        ibv_post_send(client_qp, &server_send_wr, &bad_server_send_wr);
 
         ibv_post_send(client_qp, &server_send_comp_wr, &bad_server_send_comp_wr); // send completion signal to client
         process_work_completion_events(io_completion_channel, &wc, 1);
