@@ -2,51 +2,53 @@ version: '3'
 services:
     server:
         image: mytest
+        deploy:
+            replicas: 2
         stdin_open: true
         tty: true
-        port:
+        ports:
             - '8600:8600'
         volumes:
             - '~/experiment/socket/bin:/home/bin'
 
     middle1:
         image: mytest
+        deploy:
+            replicas: 2
         stdin_open: true
         tty: true
-        port:
-            - '8600:8600'
+        ports:
             - '8601:8601'
         volumes:
             - '~/experiment/socket/bin:/home/bin'
 
     middle2:
         image: mytest
+        deploy:
+            replicas: 2
         stdin_open: true
         tty: true
-        port:
-            - '8601:8601'
+        ports:
             - '8602:8602'
         volumes:
             - '~/experiment/socket/bin:/home/bin'
 
     middle3:
         image: mytest
+        deploy:
+            replicas: 2
         stdin_open: true
         tty: true
-        port:
-            - '8602:8602'
+        ports:
             - '8603:8603'
         volumes:
             - '~/experiment/socket/bin:/home/bin'
 
     client:
         image: mytest
+        deploy:
+            replicas: 2
         stdin_open: true
         tty: true
-        port:
-            - '8600:8600'
-            - '8601:8601'
-            - '8602:8602'
-            - '8603:8603'
         volumes:
             - '~/experiment/socket/bin:/home/bin'
