@@ -32,7 +32,8 @@ public:
         {
             exit(EXIT_FAILURE);
         }
-
+        int opt = 1;
+        setsockopt(_serverSockfd, SOL_SOCKET, SO_REUSEADDR, (const void *)&opt, sizeof(opt));
         serverInfo.sin_family = PF_INET;
         serverInfo.sin_addr.s_addr = inet_addr(_args->ip);
         serverInfo.sin_port = htons(_args->port);
@@ -50,6 +51,7 @@ public:
         {
             exit(EXIT_FAILURE);
         }
+        setsockopt(_sockfd, SOL_SOCKET, SO_REUSEADDR, (const void *)&opt, sizeof(opt));
         bind(_sockfd, (struct sockaddr *)&middleInfo, sizeof(middleInfo));
         listen(_sockfd, 5);
     }

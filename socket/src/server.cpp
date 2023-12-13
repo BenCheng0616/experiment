@@ -33,6 +33,8 @@ public:
         serverInfo.sin_addr.s_addr = INADDR_ANY;
         serverInfo.sin_port = htons(_args->port);
         _sockfd = socket(AF_INET, SOCK_STREAM, 0);
+        int opt = 1;
+        setsockopt(_sockfd, SOL_SOCKET, SO_REUSEADDR, (const void *)&opt, sizeof(opt));
         bind(_sockfd, (struct sockaddr *)&serverInfo, sizeof(serverInfo));
         listen(_sockfd, 5);
     }

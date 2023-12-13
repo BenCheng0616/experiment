@@ -36,6 +36,8 @@ public:
         {
             exit(EXIT_FAILURE);
         }
+        int opt = 1;
+        setsockopt(_sockfd, SOL_SOCKET, SO_REUSEADDR, (const void *)&opt, sizeof(opt));
         if ((res = connect(_sockfd, (struct sockaddr *)&serverInfo, sizeof(serverInfo))) == -1)
         {
             exit(EXIT_FAILURE);
