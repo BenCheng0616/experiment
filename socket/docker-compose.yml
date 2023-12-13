@@ -6,6 +6,8 @@ services:
             replicas: 2
         stdin_open: true
         tty: true
+        networks:
+            - test_net
         ports:
             - '8600:8600'
         volumes:
@@ -17,6 +19,8 @@ services:
             replicas: 2
         stdin_open: true
         tty: true
+        networks:
+            - test_net
         ports:
             - '8601:8601'
         volumes:
@@ -28,6 +32,8 @@ services:
             replicas: 2
         stdin_open: true
         tty: true
+        networks:
+            - test_net
         ports:
             - '8602:8602'
         volumes:
@@ -39,6 +45,8 @@ services:
             replicas: 2
         stdin_open: true
         tty: true
+        networks:
+            - test_net
         ports:
             - '8603:8603'
         volumes:
@@ -50,5 +58,12 @@ services:
             replicas: 2
         stdin_open: true
         tty: true
+        networks:
+            - test_net
         volumes:
             - '~/experiment/socket/bin:/home/bin'
+
+networks:
+    test_net:
+        external: true
+        name: testnet

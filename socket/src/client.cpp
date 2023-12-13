@@ -59,7 +59,7 @@ public:
             bench.singleStart();
             send(_sockfd, buffer, _args->size, 0);
 
-            ret = recv(_sockfd, buffer, _args->size, MSG_WAITALL);
+            recv(_sockfd, buffer, _args->size, MSG_WAITALL);
 
             bench.benchmark();
         }
