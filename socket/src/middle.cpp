@@ -77,6 +77,10 @@ public:
             send(_clientSockfd, buffer, _args->size, 0);
         }
     }
+    void stop()
+    {
+        close(_serverSockfd);
+    }
 
 private:
     Arguments *_args;
@@ -93,5 +97,6 @@ int main(int argc, char *argv[])
     middle.init();
     middle.waitforClient();
     middle.communicate();
+    middle.stop();
     return 0;
 }
