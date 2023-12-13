@@ -27,24 +27,19 @@ public:
     {
         // connect to server.
         int res = 0;
-        struct addrinfo *serverInfo = NULL;
-        struct addrinfo hints;
-        memset(&hints, 0, sizeof(hints));
-        hints.ai_family = AF_INET;
-        hints.ai_socktype = SOCK_STREAM;
-        hints.ai_protocol = IPPROTO_TCP;
-        res = getaddrinfo(_args->ip, std::to_string(_args->port).c_str(), &hints, &serverInfo);
-        if ((_sockfd = socket(serverInfo->ai_family, serverInfo->ai_socktype, serverInfo->ai_protocol)) == -1)
+        struct sockaddr_in serverInfo;
+        bzero(&serverInfo, sizeof(serverInfo));
+        serverInfo.sin_family = PF_INET;
+        serverInfo.sin_addr.s_addr = inet_addr(_args->ip);
+        serverInfo.sin_port = htons(_args->port);
+        if ((_sockfd = socket(AF_INET, SOCK_STREAM, 0)) == -1)
         {
             exit(EXIT_FAILURE);
         }
-        int opt = 1;
-        setsockopt(_sockfd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(int));
-        if ((res = connect(_sockfd, serverInfo->ai_addr, serverInfo->ai_addrlen)) == -1)
+        if ((res = connect(_sockfd, (struct sockaddr *)&serverInfo, sizeof(serverInfo))) == -1)
         {
             exit(EXIT_FAILURE);
         }
-        freeaddrinfo(serverInfo);
     }
 
     void communicate()

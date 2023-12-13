@@ -26,41 +26,32 @@ public:
     {
         // connect to server
         int res = 0;
-        struct addrinfo *serverInfo = NULL;
-        struct addrinfo hints;
-        memset(&hints, 0, sizeof(hints));
-        hints.ai_family = AF_INET;
-        hints.ai_socktype = SOCK_STREAM;
-        hints.ai_protocol = IPPROTO_TCP;
-        res = getaddrinfo(_args->ip, std::to_string(_args->port).c_str(), &hints, &serverInfo);
-        if ((_serverSockfd = socket(serverInfo->ai_family, serverInfo->ai_socktype, serverInfo->ai_protocol)) == -1)
-        {
-            exit(EXIT_FAILURE);
-        }
-        int opt = 1;
-        setsockopt(_serverSockfd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(int));
-        if ((res = connect(_serverSockfd, serverInfo->ai_addr, serverInfo->ai_addrlen)) == -1)
-        {
-            exit(EXIT_FAILURE);
-        }
-        freeaddrinfo(serverInfo);
-
-        // build socket for client
-        memset(&hints, 0, sizeof(hints));
-        hints.ai_family = AF_INET;
-        hints.ai_socktype = SOCK_STREAM;
-        hints.ai_protocol = IPPROTO_TCP;
-        hints.ai_flags = AI_PASSIVE;
-        res = getaddrinfo(NULL, std::to_string(_args->port + 1).c_str(), &hints, &serverInfo);
-        if ((_sockfd = socket(serverInfo->ai_family, serverInfo->ai_socktype, serverInfo->ai_protocol)) == -1)
+        struct sockaddr_in serverInfo, middleInfo;
+        bzero(&serverInfo, sizeof(serverInfo));
+        if ((_serverSockfd = socket(AF_INET, SOCK_STREAM, 0)) == -1)
         {
             exit(EXIT_FAILURE);
         }
 
-        setsockopt(_sockfd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(int));
-        bind(_sockfd, serverInfo->ai_addr, serverInfo->ai_addrlen);
+        serverInfo.sin_family = PF_INET;
+        serverInfo.sin_addr.s_addr = inet_addr(_args->ip);
+        serverInfo.sin_port = htons(_args->port);
+
+        if ((res = connect(_serverSockfd, (struct sockaddr *)&serverInfo, sizeof(serverInfo))) == -1)
+        {
+            exit(EXIT_FAILURE);
+        }
+
+        bzero(&middleInfo, sizeof(middleInfo));
+        middleInfo.sin_family = PF_INET;
+        middleInfo.sin_addr.s_addr = INADDR_ANY;
+        middleInfo.sin_port = htons(_args->port + 1);
+        if ((_sockfd = socket(AF_INET, SOCK_STREAM, 0)) == -1)
+        {
+            exit(EXIT_FAILURE);
+        }
+        bind(_sockfd, (struct sockaddr *)&middleInfo, sizeof(middleInfo));
         listen(_sockfd, 5);
-        freeaddrinfo(serverInfo);
     }
 
     void waitforClient()

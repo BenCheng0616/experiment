@@ -26,24 +26,15 @@ public:
     void init()
     {
         int res = 0;
-        struct addrinfo *serverInfo = NULL;
-        struct addrinfo hints;
-        memset(&hints, 0, sizeof(hints));
-        hints.ai_family = AF_INET;
-        hints.ai_socktype = SOCK_STREAM;
-        hints.ai_protocol = IPPROTO_TCP;
-        hints.ai_flags = AI_PASSIVE;
-        res = getaddrinfo(NULL, std::to_string(_args->port).c_str(), &hints, &serverInfo);
-        if ((_sockfd = socket(serverInfo->ai_family, serverInfo->ai_socktype, serverInfo->ai_protocol)) == -1)
-        {
-            exit(EXIT_FAILURE);
-        }
-        int opt = 1;
-        setsockopt(_sockfd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(int));
-        bind(_sockfd, serverInfo->ai_addr, serverInfo->ai_addrlen);
-        listen(_sockfd, 5);
+        struct sockaddr_in serverInfo;
+        bzero(&serverInfo, sizeof(serverInfo));
 
-        freeaddrinfo(serverInfo);
+        serverInfo.sin_family = PF_INET;
+        serverInfo.sin_addr.s_addr = INADDR_ANY;
+        serverInfo.sin_port = htons(_args->port);
+        _sockfd = socket(AF_INET, SOCK_STREAM, 0);
+        bind(_sockfd, (struct sockaddr *)&serverInfo, sizeof(serverInfo));
+        listen(_sockfd, 5);
     }
 
     void waitforClient()
